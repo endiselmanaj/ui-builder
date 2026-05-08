@@ -1,0 +1,12 @@
+node_modules
+client/node_modules
+templates/base/node_modules
+data
+*.log
+.DS_Store
+.git
+.gitignore
+.env
+.env.local
+docs/*
+.superpowers

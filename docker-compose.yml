@@ -1,0 +1,16 @@
+services:
+  ui-builder:
+    build: .
+    container_name: ui-builder
+    ports:
+      - "3001:3001"
+      - "5173:5173"
+    environment:
+      # Required: long-lived OAuth token from `claude setup-token` on the host.
+      # Without --bare, the CLI inside the container reads this for auth
+      # (there is no macOS keychain to shadow it on Linux).
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+    # Uncomment to persist generations / sessions across container restarts.
+    # By default state is ephemeral, which is what you want for a fresh demo.
+    # volumes:
+    #   - ./data:/app/ui-builder/data
