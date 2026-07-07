@@ -225,10 +225,20 @@ class Manager {
     return this.sessions.has(id);
   }
 
-  runAgent(id: string, fullPrompt: string, settings: Settings): EventEmitter {
+  runAgent(
+    id: string,
+    fullPrompt: string,
+    settings: Settings,
+    opts?: { chrome?: boolean },
+  ): EventEmitter {
     const s = this.must(id);
     this.setStatus(s, "agent-running");
-    const ee = runAgent({ cwd: s.dir, prompt: fullPrompt, settings });
+    const ee = runAgent({
+      cwd: s.dir,
+      prompt: fullPrompt,
+      settings,
+      chrome: opts?.chrome,
+    });
     s.agent = (ee as any).child as ChildProcess | undefined;
 
     const transcriptPath = path.join(s.dir, "transcript.jsonl");
