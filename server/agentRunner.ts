@@ -154,6 +154,29 @@ export function buildReviewPrompt(opts: {
   ].join("\n");
 }
 
+// Shared base sections between the skills-mode prompt and the context-lab
+// prompt. Keep in sync with the session template.
+export const PROJECT_BASE_LINES = [
+  "You are a coding agent in a Vite + React + TypeScript + Tailwind v4 project at the current working directory.",
+  "The dev server is running and HMR is live; edits to files in src/ show in the user's preview iframe immediately.",
+  "",
+  "# Project layout",
+  "- src/main.tsx mounts <App /> from src/App.tsx — do not touch main.tsx.",
+  "- src/App.tsx is your entry; replace its contents with your design.",
+  "- Add components under src/components/. Use src/lib/cn.ts for class merging.",
+  "- Tailwind v4 is set up via @tailwindcss/vite — use utility classes freely.",
+  "- index.html and vite.config.ts are owned by the harness — don't touch them.",
+  "",
+  "# Pre-installed packages (use any of these freely)",
+  "- react, react-dom",
+  "- clsx, tailwind-merge (cn helper at src/lib/cn.ts)",
+  "- recharts",
+  "- react-hook-form, zod, @hookform/resolvers",
+  "- lucide-react (icons)",
+  "",
+  "Do NOT run `npm install`. The shared node_modules is read-only across sessions; if you need a package that isn't preinstalled, work around it with the available libraries.",
+];
+
 export function buildAgentPrompt(opts: {
   userPrompt: string;
   loadedSkills: { id: string; name: string }[];
@@ -166,24 +189,7 @@ export function buildAgentPrompt(opts: {
           .join("\n");
 
   return [
-    "You are a coding agent in a Vite + React + TypeScript + Tailwind v4 project at the current working directory.",
-    "The dev server is running and HMR is live; edits to files in src/ show in the user's preview iframe immediately.",
-    "",
-    "# Project layout",
-    "- src/main.tsx mounts <App /> from src/App.tsx — do not touch main.tsx.",
-    "- src/App.tsx is your entry; replace its contents with your design.",
-    "- Add components under src/components/. Use src/lib/cn.ts for class merging.",
-    "- Tailwind v4 is set up via @tailwindcss/vite — use utility classes freely.",
-    "- index.html and vite.config.ts are owned by the harness — don't touch them.",
-    "",
-    "# Pre-installed packages (use any of these freely)",
-    "- react, react-dom",
-    "- clsx, tailwind-merge (cn helper at src/lib/cn.ts)",
-    "- recharts",
-    "- react-hook-form, zod, @hookform/resolvers",
-    "- lucide-react (icons)",
-    "",
-    "Do NOT run `npm install`. The shared node_modules is read-only across sessions; if you need a package that isn't preinstalled, work around it with the available libraries.",
+    ...PROJECT_BASE_LINES,
     "",
     "# Skills loaded for this generation",
     "The following skill rule sheets are in .claude/skills/. Read EVERY skill file listed below before writing any code; their guidance overrides your defaults.",
