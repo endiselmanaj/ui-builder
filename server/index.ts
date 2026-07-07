@@ -10,7 +10,15 @@ import { mountSessionProxy, attachUpgrade } from "./proxy.js";
 import { buildAgentPrompt, buildReviewPrompt, runAgent, buildAgentArgs } from "./agentRunner.js";
 import { EventEmitter } from "events";
 import { spawn, type ChildProcess } from "child_process";
-import type { Settings } from "./types.js";
+import multer from "multer";
+import { contextLibrary } from "./contextLibrary.js";
+import {
+  buildContextAgentPrompt,
+  DEFAULT_CONTEXT_PROMPT,
+  slugify,
+  sourceNeedsChrome,
+} from "./contextPrompt.js";
+import type { Settings, ContextSource, ContextTier } from "./types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +35,7 @@ const PON_SKILLS_DIR = path.resolve(
 const DATA_DIR = path.join(ROOT, "data");
 const WORKSPACE_FILE = path.join(DATA_DIR, "workspace.json");
 const GENERATIONS_FILE = path.join(DATA_DIR, "generations.json");
+const CONTEXT_GENERATIONS_FILE = path.join(DATA_DIR, "context-generations.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 
 const app = express();
@@ -181,6 +190,52 @@ function updateGeneration(
   all[idx] = patch(all[idx]);
   writeGenerations(all);
   return all[idx];
+}
+
+// ---------- context lab persistence ----------
+
+type ContextVariant = {
+  tierId: string;
+  label: string;
+  sourceIds: string[];
+  sessionId: string;
+  previewUrl: string;
+  chrome: boolean; // this variant drives the browser (single-channel mutex key)
+};
+
+type ContextGeneration = {
+  id: string;
+  createdAt: string;
+  prompt: string;
+  status: GenerationStatus;
+  variants: ContextVariant[];
+  error?: string;
+};
+
+function readContextGenerations(): ContextGeneration[] {
+  ensureDataDir();
+  if (!fs.existsSync(CONTEXT_GENERATIONS_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(CONTEXT_GENERATIONS_FILE, "utf-8"));
+  } catch {
+    return [];
+  }
+}
+
+function writeContextGenerations(gens: ContextGeneration[]) {
+  ensureDataDir();
+  fs.writeFileSync(CONTEXT_GENERATIONS_FILE, JSON.stringify(gens, null, 2));
+}
+
+function updateContextGeneration(
+  id: string,
+  patch: (g: ContextGeneration) => ContextGeneration,
+) {
+  const all = readContextGenerations();
+  const idx = all.findIndex((g) => g.id === id);
+  if (idx < 0) return;
+  all[idx] = patch(all[idx]);
+  writeContextGenerations(all);
 }
 
 // ---------- settings (claude flag config) ----------
@@ -537,6 +592,320 @@ async function launchVariant(opts: {
     previewUrl: `/api/preview/${session.id}/`,
   };
 }
+
+// ---------- context lab ----------
+
+contextLibrary.ensureSeeds();
+
+// Trusted-local-assets allowlist. The agent has Bash and reads these files as
+// source of truth, so reject anything outside the expected doc/image types.
+const ALLOWED_CONTEXT_EXT = new Set([
+  ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".xml", ".md", ".txt", ".json", ".csv",
+]);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 10 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_CONTEXT_EXT.has(ext)) return cb(null, true);
+    cb(new Error(`file type not allowed: ${ext || file.originalname}`));
+  },
+});
+
+app.get("/api/context/sources", (_req, res) => {
+  res.json(contextLibrary.listSources());
+});
+
+app.post("/api/context/sources", (req, res) => {
+  // Run multer manually so a fileFilter/limit rejection returns JSON 400,
+  // not Express's default HTML 500.
+  upload.array("files", 10)(req, res, (mErr: any) => {
+    if (mErr) return res.status(400).json({ error: String(mErr.message ?? mErr) });
+    const label = (req.body?.label ?? "").toString().trim();
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    if (!label) return res.status(400).json({ error: "label required" });
+    if (files.length === 0) return res.status(400).json({ error: "at least one file required" });
+    const src = contextLibrary.createFileSource(
+      label,
+      files.map((f) => ({ name: f.originalname, buffer: f.buffer })),
+    );
+    res.json(src);
+  });
+});
+
+app.post("/api/context/sources/url", (req, res) => {
+  const { label, urls, instructions } = req.body as {
+    label?: string;
+    urls?: string[];
+    instructions?: string;
+  };
+  if (!label?.trim()) return res.status(400).json({ error: "label required" });
+  const clean = (Array.isArray(urls) ? urls : [])
+    .map((u) => String(u).trim())
+    .filter((u) => /^https?:\/\//.test(u));
+  if (clean.length === 0) return res.status(400).json({ error: "at least one http(s) url required" });
+  res.json(contextLibrary.createUrlSource(label.trim(), clean, instructions?.trim() || undefined));
+});
+
+app.delete("/api/context/sources/:id", (req, res) => {
+  contextLibrary.deleteSource(req.params.id);
+  res.json({ ok: true });
+});
+
+app.get("/api/context/tiers", (_req, res) => {
+  res.json(contextLibrary.readTiers());
+});
+
+app.put("/api/context/tiers", (req, res) => {
+  const body = req.body as ContextTier[];
+  if (!Array.isArray(body) || body.length !== 3) {
+    return res.status(400).json({ error: "expected exactly 3 tiers" });
+  }
+  const known = new Set(contextLibrary.listSources().map((s) => s.id));
+  const tiers = body.map((t) => ({
+    id: String(t.id),
+    label: String(t.label),
+    sourceIds: (t.sourceIds ?? []).filter((id) => known.has(id)),
+  }));
+  res.json(contextLibrary.writeTiers(tiers));
+});
+
+app.get("/api/context-lab/generations", (_req, res) => {
+  res.json(reconcileContextGenerations());
+});
+
+// A generation persisted as "running" is stale after a server restart (the
+// SSE route already marks all sessions "stopped" on boot). Derive the real
+// status from the sessions and persist the correction so the UI never shows a
+// permanently-spinning card.
+function reconcileContextGenerations(): ContextGeneration[] {
+  const all = readContextGenerations();
+  let changed = false;
+  for (const g of all) {
+    if (g.status !== "running") continue;
+    const statuses = g.variants.map((v) => sessionManager.status(v.sessionId));
+    const anyLive = statuses.some((s) => s === "agent-running" || s === "starting-vite");
+    if (anyLive) continue; // genuinely still running
+    const terminal = statuses.every(
+      (s) => s === "ready" || s === "errored" || s === "stopped" || s === null,
+    );
+    if (terminal) {
+      g.status = statuses.some((s) => s === "errored" || s === "stopped" || s === null)
+        ? "errored"
+        : "ready";
+      changed = true;
+    }
+  }
+  if (changed) writeContextGenerations(all);
+  return all;
+}
+
+app.delete("/api/context-lab/generations/:id", async (req, res) => {
+  const all = readContextGenerations();
+  const gen = all.find((g) => g.id === req.params.id);
+  writeContextGenerations(all.filter((g) => g.id !== req.params.id));
+  if (gen) {
+    for (const v of gen.variants) await sessionManager.destroy(v.sessionId);
+  }
+  res.json({ ok: true });
+});
+
+app.post("/api/context-lab/generate", async (req, res) => {
+  const raw = (req.body?.prompt ?? "").toString().trim();
+  const prompt = raw.length > 0 ? raw : DEFAULT_CONTEXT_PROMPT;
+  const settings = readSettings();
+  const tiers = contextLibrary.readTiers().filter((t) => t.sourceIds.length > 0);
+  if (tiers.length === 0) {
+    return res.status(400).json({
+      error: "no tier has any sources — add sources to tiers first",
+    });
+  }
+
+  const willUseChrome = tiers.some((t) =>
+    t.sourceIds.some((id) => contextLibrary.getSource(id)?.kind === "url"),
+  );
+
+  // Single-chrome mutex: only one browser-driving generation at a time (the
+  // extension is a single serial channel). Reconcile first so a stale
+  // "running" from a prior boot doesn't lock the room out forever.
+  if (willUseChrome) {
+    const chromeBusy = reconcileContextGenerations().some(
+      (g) => g.status === "running" && g.variants.some((v) => v.chrome),
+    );
+    if (chromeBusy) {
+      return res.status(409).json({
+        error:
+          "a Chrome-browsing generation is still running — wait for it to finish (single browser channel)",
+      });
+    }
+  }
+
+  // 1) Resolve tiers → sources, create sessions, install files (fast, sync).
+  const prepared = tiers.map((tier) => {
+    const sources = tier.sourceIds
+      .map((id) => contextLibrary.getSource(id))
+      .filter((s): s is ContextSource => s !== null);
+    const session = sessionManager.create();
+    sessionManager.installContextFiles(
+      session.id,
+      sources
+        .filter((s) => s.kind === "file")
+        .map((s) => ({
+          slug: slugify(s.label),
+          files: s.files.map((name) => ({
+            name,
+            absPath: path.join(contextLibrary.sourceDir(s.id), name),
+          })),
+        })),
+    );
+    return {
+      tier,
+      sources,
+      sessionId: session.id,
+      chrome: sourceNeedsChrome(sources),
+    };
+  });
+
+  // 2) Boot all Vite servers CONCURRENTLY (true 3-up start, not sequential).
+  try {
+    await Promise.all(prepared.map((p) => sessionManager.startVite(p.sessionId)));
+  } catch (err: any) {
+    // Partial failure: tear down every session we created so none are orphaned.
+    for (const p of prepared) await sessionManager.destroy(p.sessionId);
+    console.error("context generate startVite error:", err?.message ?? err);
+    return res
+      .status(500)
+      .json({ error: err?.message ?? "failed to start preview servers" });
+  }
+
+  const variants: ContextVariant[] = prepared.map((p) => ({
+    tierId: p.tier.id,
+    label: p.tier.label,
+    sourceIds: p.tier.sourceIds,
+    sessionId: p.sessionId,
+    previewUrl: `/api/preview/${p.sessionId}/`,
+    chrome: p.chrome,
+  }));
+
+  const gen: ContextGeneration = {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    prompt,
+    status: "running",
+    variants,
+  };
+  const all = readContextGenerations();
+  all.unshift(gen);
+  writeContextGenerations(all);
+
+  // 3) Spawn each agent and attach its completion listener in the SAME
+  // synchronous tick as the spawn — the child's async 'close' cannot fire
+  // before the listener is registered, so no end event is ever missed.
+  let remaining = prepared.length;
+  let errored = false;
+  const rollup = (code: number) => {
+    if (code !== 0) errored = true;
+    if (--remaining <= 0) {
+      updateContextGeneration(gen.id, (g) => ({
+        ...g,
+        status: errored ? "errored" : "ready",
+      }));
+    }
+  };
+  for (const p of prepared) {
+    const fullPrompt = buildContextAgentPrompt({
+      userPrompt: prompt,
+      sources: p.sources,
+    });
+    const bus = sessionManager.runAgent(p.sessionId, fullPrompt, settings, {
+      chrome: p.chrome,
+    });
+    const onEnd = (info: any) => {
+      bus.off("end", onEnd);
+      rollup(info?.code ?? 1);
+    };
+    bus.on("end", onEnd);
+  }
+
+  res.json(gen);
+});
+
+// The preflight must exercise the SAME path the real tier-3 run does — not
+// just "is the extension alive" — or it's a false-confidence canary. It opens
+// a tab, navigates the configured Figma URL, screenshots it, and reports
+// whether it saw the design vs a login/permission wall.
+function buildPreflightPrompt(figmaUrl: string): string {
+  return [
+    "You are verifying the claude-in-chrome browser integration end to end.",
+    "The browser tools are deferred; if a claude-in-chrome tool is not directly callable, load it first with ToolSearch (query: \"select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__computer\").",
+    "Steps:",
+    "1. tabs_context_mcp with createIfEmpty:true, then create a fresh tab.",
+    `2. Navigate to: ${figmaUrl}`,
+    "3. Wait for it to load, then take one screenshot.",
+    "4. Judge what you see. If it is a Figma design/prototype, reply with exactly: OK design-visible. If it is a login page, 'request access', or permission wall, reply with exactly: FAIL login-wall. If the browser tools never responded/connected, reply with exactly: FAIL not-connected.",
+    "Reply with ONLY that one line. Then close the tab.",
+  ].join("\n");
+}
+
+app.post("/api/context-lab/preflight", (_req, res) => {
+  // Use the first url from any tier-3 (chrome) source so the canary hits the
+  // real asset. Fall back to figma.com if none configured.
+  const urlSource = contextLibrary
+    .listSources()
+    .find((s) => s.kind === "url" && (s.urls?.length ?? 0) > 0);
+  const figmaUrl = urlSource?.urls?.[0] ?? "https://www.figma.com";
+
+  const settings = readSettings();
+  // Same permission mode as the real chrome generate run, so a pass here means
+  // the production configuration works.
+  const args = [
+    "-p",
+    buildPreflightPrompt(figmaUrl),
+    "--chrome",
+    "--permission-mode",
+    settings.permissionMode === "dontAsk" ? "acceptEdits" : settings.permissionMode,
+    "--output-format",
+    "json",
+  ];
+  const child = spawn("claude", args, {
+    cwd: os.tmpdir(),
+    env: { ...process.env },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let out = "";
+  let done = false;
+  const finish = (ok: boolean, detail: string) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    res.json({ ok, detail });
+  };
+  const timer = setTimeout(() => {
+    try { child.kill("SIGTERM"); } catch {}
+    finish(false, "preflight timed out after 120s");
+  }, 120_000);
+  child.stdout.on("data", (b: Buffer) => (out += b.toString()));
+  child.on("close", () => {
+    try {
+      const parsed = JSON.parse(out);
+      const text = String(parsed?.result ?? "");
+      if (text.includes("OK design-visible")) {
+        return finish(true, "Chrome connected and the Figma design rendered");
+      }
+      if (text.includes("login-wall")) {
+        return finish(false, "Chrome connected but the URL shows a login/permission wall — log into Figma / fix sharing");
+      }
+      if (text.includes("not-connected")) {
+        return finish(false, "browser extension did not respond — open Chrome, connect the extension");
+      }
+      finish(false, text.slice(0, 300) || "inconclusive preflight");
+    } catch {
+      finish(false, `unparseable preflight output: ${out.slice(0, 200)}`);
+    }
+  });
+  child.on("error", (err) => finish(false, String(err?.message ?? err)));
+});
 
 // ---------- review agent ----------
 
