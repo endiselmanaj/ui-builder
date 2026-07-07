@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { fileURLToPath } from "url";
 import getPort from "get-port";
 import { runAgent } from "./agentRunner.js";
+import { copyContextEntries, type ContextInstallEntry } from "./contextFiles.js";
 import type { Settings } from "./types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -120,6 +121,11 @@ class Manager {
       if (!fs.existsSync(src)) continue;
       fs.copyFileSync(src, path.join(target, `${skillId}.md`));
     }
+  }
+
+  installContextFiles(id: string, entries: ContextInstallEntry[]) {
+    const s = this.must(id);
+    copyContextEntries(s.dir, entries);
   }
 
   async startVite(id: string): Promise<{ port: number }> {
