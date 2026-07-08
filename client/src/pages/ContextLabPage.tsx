@@ -122,7 +122,7 @@ export function ContextLabPage() {
         <PromptInput
           value={prompt}
           onChange={setPrompt}
-          disabled={busy}
+          disabled={busy || preflight.state === "running"}
           onSubmit={generate}
         />
 
@@ -148,7 +148,7 @@ export function ContextLabPage() {
           <button
             className="primary"
             onClick={generate}
-            disabled={busy || prompt.trim().length === 0}
+            disabled={busy || preflight.state === "running" || prompt.trim().length === 0}
           >
             {busy ? "Generating…" : "Generate 3 variants"}
           </button>
