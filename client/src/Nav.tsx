@@ -26,6 +26,12 @@ export function Nav({
         >
           Skills
         </Link>
+        <Link
+          to="/context-lab"
+          className={`nav-tab${pathname === "/context-lab" ? " active" : ""}`}
+        >
+          Context Lab
+        </Link>
       </div>
       <button
         className="ghost nav-settings"

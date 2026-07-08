@@ -53,3 +53,37 @@ export type AgentEvent =
   | { type: "error"; text: string }
   | { type: "raw"; line: string }
   | { type: string; [k: string]: unknown };
+
+export type ContextSource = {
+  id: string;
+  label: string;
+  kind: "file" | "url";
+  files: string[];
+  urls?: string[];
+  instructions?: string;
+  createdAt: string;
+};
+
+export type ContextTier = {
+  id: string;
+  label: string;
+  sourceIds: string[];
+};
+
+export type ContextVariant = {
+  tierId: string;
+  label: string;
+  sourceIds: string[];
+  sessionId: string;
+  previewUrl: string;
+  chrome: boolean; // this variant drives the browser (single-channel mutex key)
+};
+
+export type ContextGeneration = {
+  id: string;
+  createdAt: string;
+  prompt: string;
+  status: GenerationStatus;
+  variants: ContextVariant[];
+  error?: string;
+};

@@ -6,6 +6,8 @@ export type AgentOptions = {
   cwd: string;
   prompt: string;
   settings: Settings;
+  /** attach the claude-in-chrome browser (drops --tools so MCP tools load) */
+  chrome?: boolean;
 };
 
 // EventEmitter the orchestrator subscribes to. Carries the spawned child
@@ -13,7 +15,9 @@ export type AgentOptions = {
 export type AgentEmitter = EventEmitter & { child: ChildProcess };
 
 export function runAgent(opts: AgentOptions): AgentEmitter {
-  const args = buildAgentArgs(opts.settings, opts.prompt);
+  const args = buildAgentArgs(opts.settings, opts.prompt, {
+    chrome: opts.chrome,
+  });
 
   // stdin: "ignore" closes the child's stdin so claude doesn't print the
   // "no stdin data received in 3s" warning and we save 3s on every cold call.
@@ -67,7 +71,11 @@ export function runAgent(opts: AgentOptions): AgentEmitter {
   return ee;
 }
 
-export function buildAgentArgs(settings: Settings, prompt: string): string[] {
+export function buildAgentArgs(
+  settings: Settings,
+  prompt: string,
+  opts?: { chrome?: boolean },
+): string[] {
   const args: string[] = [];
   if (settings.bare) args.push("--bare");
   args.push("-p", prompt);
@@ -82,14 +90,23 @@ export function buildAgentArgs(settings: Settings, prompt: string): string[] {
       ? "acceptEdits"
       : settings.permissionMode,
   );
-  // Default to a real tool set in agent mode; only respect a non-empty
-  // override if it actually has tools (settings.tools "" was the old "no
-  // tools" pattern from the one-shot pipeline).
-  const tools =
-    settings.tools && settings.tools.trim().length > 0
-      ? settings.tools
-      : "Edit,Write,Read,Bash";
-  args.push("--tools", tools);
+  if (opts?.chrome) {
+    // Chrome runs need the full default toolset. A --tools "Edit,Write,Read,Bash"
+    // allowlist would exclude the built-in Skill/ToolSearch tools, which the
+    // agent uses to load the deferred mcp__claude-in-chrome__* browser tools.
+    // Omitting --tools yields all built-ins (incl. Edit/Write/Read/Bash), so the
+    // agent can browse AND write files.
+    args.push("--chrome");
+  } else {
+    // Default to a real tool set in agent mode; only respect a non-empty
+    // override if it actually has tools (settings.tools "" was the old "no
+    // tools" pattern from the one-shot pipeline).
+    const tools =
+      settings.tools && settings.tools.trim().length > 0
+        ? settings.tools
+        : "Edit,Write,Read,Bash";
+    args.push("--tools", tools);
+  }
   if (settings.effort) args.push("--effort", settings.effort);
   if (settings.maxBudgetUsd !== null) {
     args.push("--max-budget-usd", String(settings.maxBudgetUsd));
@@ -154,6 +171,29 @@ export function buildReviewPrompt(opts: {
   ].join("\n");
 }
 
+// Shared base sections between the skills-mode prompt and the context-lab
+// prompt. Keep in sync with the session template.
+export const PROJECT_BASE_LINES = [
+  "You are a coding agent in a Vite + React + TypeScript + Tailwind v4 project at the current working directory.",
+  "The dev server is running and HMR is live; edits to files in src/ show in the user's preview iframe immediately.",
+  "",
+  "# Project layout",
+  "- src/main.tsx mounts <App /> from src/App.tsx — do not touch main.tsx.",
+  "- src/App.tsx is your entry; replace its contents with your design.",
+  "- Add components under src/components/. Use src/lib/cn.ts for class merging.",
+  "- Tailwind v4 is set up via @tailwindcss/vite — use utility classes freely.",
+  "- index.html and vite.config.ts are owned by the harness — don't touch them.",
+  "",
+  "# Pre-installed packages (use any of these freely)",
+  "- react, react-dom",
+  "- clsx, tailwind-merge (cn helper at src/lib/cn.ts)",
+  "- recharts",
+  "- react-hook-form, zod, @hookform/resolvers",
+  "- lucide-react (icons)",
+  "",
+  "Do NOT run `npm install`. The shared node_modules is read-only across sessions; if you need a package that isn't preinstalled, work around it with the available libraries.",
+];
+
 export function buildAgentPrompt(opts: {
   userPrompt: string;
   loadedSkills: { id: string; name: string }[];
@@ -166,24 +206,7 @@ export function buildAgentPrompt(opts: {
           .join("\n");
 
   return [
-    "You are a coding agent in a Vite + React + TypeScript + Tailwind v4 project at the current working directory.",
-    "The dev server is running and HMR is live; edits to files in src/ show in the user's preview iframe immediately.",
-    "",
-    "# Project layout",
-    "- src/main.tsx mounts <App /> from src/App.tsx — do not touch main.tsx.",
-    "- src/App.tsx is your entry; replace its contents with your design.",
-    "- Add components under src/components/. Use src/lib/cn.ts for class merging.",
-    "- Tailwind v4 is set up via @tailwindcss/vite — use utility classes freely.",
-    "- index.html and vite.config.ts are owned by the harness — don't touch them.",
-    "",
-    "# Pre-installed packages (use any of these freely)",
-    "- react, react-dom",
-    "- clsx, tailwind-merge (cn helper at src/lib/cn.ts)",
-    "- recharts",
-    "- react-hook-form, zod, @hookform/resolvers",
-    "- lucide-react (icons)",
-    "",
-    "Do NOT run `npm install`. The shared node_modules is read-only across sessions; if you need a package that isn't preinstalled, work around it with the available libraries.",
+    ...PROJECT_BASE_LINES,
     "",
     "# Skills loaded for this generation",
     "The following skill rule sheets are in .claude/skills/. Read EVERY skill file listed below before writing any code; their guidance overrides your defaults.",

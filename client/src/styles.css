@@ -1179,3 +1179,35 @@ pre.code {
   color: #666;
   font-size: 14px;
 }
+
+/* ---------- Context Lab ---------- */
+.ctx-header h1 { margin: 0 0 4px; }
+.ctx-header { margin-bottom: 16px; }
+
+.tier-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+.tier-config { border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px; }
+.tier-config-label { font-weight: 600; margin-bottom: 6px; }
+.tier-config-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 24px; }
+.src-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid #e5e5e5; }
+.src-chip-x { border: none; background: none; cursor: pointer; font-size: 13px; padding: 0 2px; }
+.tier-add { font-size: 12px; }
+
+.ctx-sources { margin: 14px 0; }
+.ctx-sources-body { border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px; margin-top: 8px; }
+.ctx-source-list { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.ctx-source-list li { display: flex; align-items: center; gap: 10px; }
+.ctx-source-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ctx-form { display: flex; flex-direction: column; gap: 6px; }
+
+/* Grid track widths are set inline by ContextGenerationCard (from the focused
+   INDEX), so focusing any column — including the last — widens the right one.
+   These rules only handle gaps and the de-emphasis of non-focused columns. */
+.ctx-grid { display: grid; gap: 10px; transition: grid-template-columns 0.2s ease; }
+.ctx-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ctx-col.dimmed { opacity: 0.55; }
+/* When a column is focused, collapse the others' activity logs so the slim
+   thumbnails stay compact; the focused column keeps its full detail. */
+.ctx-grid.has-focus .ctx-col:not(.focused) .ctx-log { display: none; }
+.ctx-col-header { display: flex; align-items: center; gap: 8px; justify-content: space-between; cursor: pointer; background: none; border: 1px solid #e5e5e5; border-radius: 6px; padding: 6px 10px; text-align: left; }
+.ctx-col-label { font-weight: 600; font-size: 13px; }
+.ctx-log summary { cursor: pointer; font-size: 12px; }

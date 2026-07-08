@@ -19,7 +19,7 @@ function formatTime(iso: string): string {
   }
 }
 
-function StatusPill({ status }: { status: GenerationStatus }) {
+export function StatusPill({ status }: { status: GenerationStatus }) {
   const map: Record<GenerationStatus, { label: string; className: string }> = {
     running: { label: "⏱ running", className: "status running" },
     ready: { label: "✓ ready", className: "status ready" },

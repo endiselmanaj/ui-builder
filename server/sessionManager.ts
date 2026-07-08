@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { fileURLToPath } from "url";
 import getPort from "get-port";
 import { runAgent } from "./agentRunner.js";
+import { copyContextEntries, type ContextInstallEntry } from "./contextFiles.js";
 import type { Settings } from "./types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -122,6 +123,11 @@ class Manager {
     }
   }
 
+  installContextFiles(id: string, entries: ContextInstallEntry[]) {
+    const s = this.must(id);
+    copyContextEntries(s.dir, entries);
+  }
+
   async startVite(id: string): Promise<{ port: number }> {
     const s = this.must(id);
     if (s.vite && s.meta.port) return { port: s.meta.port };
@@ -225,10 +231,20 @@ class Manager {
     return this.sessions.has(id);
   }
 
-  runAgent(id: string, fullPrompt: string, settings: Settings): EventEmitter {
+  runAgent(
+    id: string,
+    fullPrompt: string,
+    settings: Settings,
+    opts?: { chrome?: boolean },
+  ): EventEmitter {
     const s = this.must(id);
     this.setStatus(s, "agent-running");
-    const ee = runAgent({ cwd: s.dir, prompt: fullPrompt, settings });
+    const ee = runAgent({
+      cwd: s.dir,
+      prompt: fullPrompt,
+      settings,
+      chrome: opts?.chrome,
+    });
     s.agent = (ee as any).child as ChildProcess | undefined;
 
     const transcriptPath = path.join(s.dir, "transcript.jsonl");
