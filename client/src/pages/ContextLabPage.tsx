@@ -122,7 +122,7 @@ export function ContextLabPage() {
         <PromptInput
           value={prompt}
           onChange={setPrompt}
-          disabled={loading}
+          disabled={busy}
           onSubmit={generate}
         />
 
