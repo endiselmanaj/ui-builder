@@ -72,8 +72,17 @@ export function ContextSourcePanel({
   }
 
   async function remove(id: string) {
-    await fetch(`/api/context/sources/${id}`, { method: "DELETE" });
-    await onChanged();
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/context/sources/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json())?.error ?? `HTTP ${res.status}`);
+      await onChanged();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

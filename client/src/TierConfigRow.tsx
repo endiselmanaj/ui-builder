@@ -32,7 +32,7 @@ export function TierConfigRow({
                   {s.label}
                   <button
                     className="src-chip-x"
-                    aria-label={`remove ${s.label}`}
+                    aria-label={`remove ${s.label} from ${tier.label}`}
                     onClick={() =>
                       updateTier(tier.id, tier.sourceIds.filter((id) => id !== s.id))
                     }
