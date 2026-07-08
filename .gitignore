@@ -9,3 +9,6 @@ data/
 
 # Superpowers brainstorm mockups
 .superpowers/
+
+# TypeScript incremental build info
+*.tsbuildinfo
