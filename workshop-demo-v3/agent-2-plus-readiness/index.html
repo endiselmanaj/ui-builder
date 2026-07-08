@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volkswagen - Wat is uw auto waard?</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --vw-blue: #001e50;
+  --vw-light-blue: #00437a;
+  --vw-accent: #2d6cc0;
+  --vw-white: #ffffff;
+  --vw-gray-100: #f7f7f7;
+  --vw-gray-200: #e5e5e5;
+  --vw-gray-300: #cccccc;
+  --vw-gray-500: #808080;
+  --vw-gray-700: #4a4a4a;
+  --vw-error: #d0021b;
+  --vw-success: #2eac6d;
+  --radius: 4px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: #333;
+  background: var(--vw-gray-100);
+  line-height: 1.5;
+  padding-bottom: 48px;
+}
+
+.header {
+  background: var(--vw-blue);
+  color: var(--vw-white);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.header svg { width: 48px; height: 48px; }
+.header h1 { font-size: 18px; font-weight: 500; }
+
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.step { display: none; }
+.step.active { display: block; }
+
+.card {
+  background: var(--vw-white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+h2 { font-size: 22px; color: var(--vw-blue); margin-bottom: 8px; font-weight: 600; }
+h3 { font-size: 16px; color: var(--vw-blue); margin-bottom: 8px; font-weight: 600; }
+
+.subtitle { color: var(--vw-gray-500); font-size: 14px; margin-bottom: 20px; }
+
+.progress {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+.progress-dot {
+  height: 4px;
+  flex: 1;
+  background: var(--vw-gray-200);
+  border-radius: 2px;
+  transition: background 0.3s;
+}
+.progress-dot.done { background: var(--vw-accent); }
+.progress-dot.current { background: var(--vw-blue); }
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--vw-gray-700);
+}
+
+input[type="text"], input[type="number"], input[type="email"], input[type="tel"],
+input[type="date"], textarea, select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--vw-gray-300);
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--vw-accent);
+}
+
+.input-row { margin-bottom: 16px; }
+
+.plate-input {
+  background: #f5c518;
+  border: 2px solid #333;
+  border-radius: 6px;
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  padding: 14px;
+  max-width: 280px;
+}
+.plate-input::placeholder { color: #999; letter-spacing: 2px; font-size: 16px; }
+
+.error-text { color: var(--vw-error); font-size: 13px; margin-top: 4px; display: none; }
+.error-text.visible { display: block; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  font-family: inherit;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--vw-blue); color: var(--vw-white); }
+.btn-primary:hover:not(:disabled) { background: var(--vw-light-blue); }
+.btn-secondary { background: var(--vw-white); color: var(--vw-blue); border: 1px solid var(--vw-blue); }
+.btn-secondary:hover:not(:disabled) { background: var(--vw-gray-100); }
+
+.btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.vehicle-result {
+  background: var(--vw-gray-100);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 16px;
+}
+.vehicle-result dl {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 6px 12px;
+  font-size: 14px;
+}
+.vehicle-result dt { font-weight: 600; color: var(--vw-gray-700); }
+.vehicle-result dd { color: #333; }
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+@media (max-width: 480px) { .choice-grid { grid-template-columns: 1fr; } }
+
+.choice-card {
+  border: 2px solid var(--vw-gray-200);
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+.choice-card:hover { border-color: var(--vw-accent); background: #f0f6ff; }
+.choice-card.selected { border-color: var(--vw-blue); background: #e8f0fc; }
+.choice-card .icon { font-size: 36px; margin-bottom: 8px; }
+.choice-card .label { font-weight: 600; font-size: 15px; color: var(--vw-blue); }
+.choice-card .desc { font-size: 13px; color: var(--vw-gray-500); margin-top: 4px; }
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+@media (max-width: 480px) { .photo-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.photo-slot {
+  aspect-ratio: 4/3;
+  border: 2px dashed var(--vw-gray-300);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--vw-gray-500);
+  text-align: center;
+  padding: 4px;
+}
+.photo-slot:hover { border-color: var(--vw-accent); background: #f0f6ff; }
+.photo-slot.filled { border-style: solid; border-color: var(--vw-success); }
+.photo-slot.filled img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-slot .slot-icon { font-size: 24px; margin-bottom: 2px; }
+.photo-slot .remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.photo-slot.filled .remove-btn { display: flex; }
+
+.photo-count {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--vw-gray-500);
+}
+
+.dealer-list { margin-top: 12px; }
+
+.dealer-card {
+  border: 2px solid var(--vw-gray-200);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.dealer-card:hover { border-color: var(--vw-accent); }
+.dealer-card.selected { border-color: var(--vw-blue); background: #f0f6ff; }
+.dealer-card .dealer-name { font-weight: 600; color: var(--vw-blue); }
+.dealer-card .dealer-addr { font-size: 13px; color: var(--vw-gray-500); margin-top: 2px; }
+.dealer-card .dealer-dist { font-size: 13px; color: var(--vw-accent); margin-top: 2px; }
+
+.time-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.time-slot {
+  padding: 8px 16px;
+  border: 1px solid var(--vw-gray-300);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.time-slot:hover { border-color: var(--vw-accent); }
+.time-slot.selected { background: var(--vw-blue); color: var(--vw-white); border-color: var(--vw-blue); }
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+}
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--vw-blue);
+}
+.checkbox-row label { font-size: 14px; font-weight: 400; color: #333; }
+
+.confirmation-box {
+  text-align: center;
+  padding: 32px 16px;
+}
+.confirmation-box .check-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--vw-success);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 32px;
+  color: #fff;
+}
+.confirmation-box p { margin-top: 8px; color: var(--vw-gray-700); font-size: 15px; }
+
+.manual-fallback { margin-top: 16px; }
+.manual-fallback .manual-fields { display: none; margin-top: 12px; }
+.manual-fallback .manual-fields.visible { display: block; }
+
+.loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--vw-gray-300);
+  border-top-color: var(--vw-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.info-banner {
+  background: #e8f0fc;
+  border-left: 3px solid var(--vw-accent);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--vw-gray-700);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-bottom: 16px;
+}
+
+.blocked-notice {
+  background: #fff3e0;
+  border-left: 3px solid #f5a623;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--vw-gray-700);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-top: 12px;
+}
+
+.summary-section { margin-top: 16px; }
+.summary-section h3 { margin-bottom: 8px; }
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--vw-gray-200);
+  font-size: 14px;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-label { color: var(--vw-gray-500); }
+.summary-value { font-weight: 500; }
+
+.footer-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--vw-gray-200);
+  color: var(--vw-gray-500);
+  font-size: 11px;
+  text-align: center;
+  padding: 6px 12px;
+  z-index: 100;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <svg viewBox="0 0 48 48" fill="none">
+    <circle cx="24" cy="24" r="23" stroke="white" stroke-width="2"/>
+    <text x="24" y="30" text-anchor="middle" fill="white" font-size="16" font-weight="bold" font-family="sans-serif">VW</text>
+  </svg>
+  <h1>Wat is uw auto waard?</h1>
+</div>
+
+<div class="container">
+
+  <!-- STEP 1: License plate -->
+  <div class="step active" id="step-plate">
+    <div class="progress"><div class="progress-dot current"></div><div class="progress-dot"></div><div class="progress-dot"></div><div class="progress-dot"></div><div class="progress-dot"></div></div>
+    <div class="card">
+      <h2>Voer uw kenteken in</h2>
+      <p class="subtitle">Wij herkennen uw auto aan de hand van uw kenteken</p>
+      <div class="input-row">
+        <input type="text" id="plate-input" class="plate-input" placeholder="XX-999-XX" maxlength="9" autocomplete="off">
+        <div class="error-text" id="plate-error">Voer een geldig Nederlands kenteken in (bijv. AB-123-CD)</div>
+      </div>
+      <div id="plate-result" style="display:none">
+        <div class="vehicle-result" id="vehicle-info"></div>
+      </div>
+      <div id="plate-not-found" style="display:none">
+        <div class="info-banner">Geen voertuig gevonden voor dit kenteken. U kunt de gegevens handmatig invoeren of contact opnemen met een dealer.</div>
+        <div class="manual-fallback">
+          <button class="btn btn-secondary" onclick="toggleManualEntry()">Handmatig invoeren</button>
+          <div class="manual-fields" id="manual-fields">
+            <div class="input-row"><label>Merk</label>
+              <select id="manual-make"><option value="">Selecteer merk</option><option>Volkswagen</option><option>Audi</option><option>BMW</option><option>Mercedes-Benz</option><option>Opel</option><option>Toyota</option><option>Peugeot</option><option>Renault</option><option>Ford</option><option>Overig</option></select>
+            </div>
+            <div class="input-row"><label>Model</label><input type="text" id="manual-model" placeholder="bijv. Golf"></div>
+            <div class="input-row"><label>Bouwjaar</label><input type="number" id="manual-year" placeholder="bijv. 2020" min="1990" max="2026"></div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="plate-lookup-btn" onclick="lookupPlate()">Zoek op</button>
+        <button class="btn btn-primary" id="plate-next-btn" onclick="goToStep('step-mileage')" style="display:none">Volgende</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Mileage -->
+  <div class="step" id="step-mileage">
+    <div class="progress"><div class="progress-dot done"></div><div class="progress-dot current"></div><div class="progress-dot"></div><div class="progress-dot"></div><div class="progress-dot"></div></div>
+    <div class="card">
+      <h2>Kilometerstand</h2>
+      <p class="subtitle">Voer de huidige kilometerstand in</p>
+      <div class="input-row">
+        <label for="mileage-input">Kilometerstand</label>
+        <input type="number" id="mileage-input" placeholder="bijv. 45000" min="0" max="999999">
+        <div class="error-text" id="mileage-error">Voer een geldige kilometerstand in (0 - 999.999 km)</div>
+      </div>
+      <div id="vehicle-summary-mileage" class="vehicle-result" style="margin-top:12px"></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goToStep('step-plate')">Terug</button>
+        <button class="btn btn-primary" onclick="validateMileage()">Volgende</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Choice -->
+  <div class="step" id="step-choice">
+    <div class="progress"><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot current"></div><div class="progress-dot"></div><div class="progress-dot"></div></div>
+    <div class="card">
+      <h2>Hoe wilt u de waarde bepalen?</h2>
+      <p class="subtitle">Kies de manier die u het beste uitkomt</p>
+      <div class="choice-grid">
+        <div class="choice-card" onclick="selectChoice('online')">
+          <div class="icon">📸</div>
+          <div class="label">Online inruilvoorstel</div>
+          <div class="desc">Upload foto's en ontvang een voorstel per e-mail</div>
+        </div>
+        <div class="choice-card" onclick="selectChoice('dealer')">
+          <div class="icon">🏢</div>
+          <div class="label">Taxatie bij uw dealer</div>
+          <div class="desc">Maak een afspraak en laat uw auto ter plaatse beoordelen</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goToStep('step-mileage')">Terug</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4A: Photos (online path) -->
+  <div class="step" id="step-photos">
+    <div class="progress"><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot current"></div><div class="progress-dot"></div></div>
+    <div class="card">
+      <h2>Foto's van uw auto</h2>
+      <p class="subtitle">Upload minimaal 1 foto, bij voorkeur alle 8 standpunten voor de beste beoordeling</p>
+      <div class="photo-grid" id="photo-grid"></div>
+      <div class="photo-count" id="photo-count">0 van 8 foto's toegevoegd</div>
+      <div class="error-text" id="photo-error">Upload minimaal 1 foto om door te gaan</div>
+      <input type="file" id="photo-file-input" accept="image/jpeg,image/png,image/heic" style="display:none" onchange="handlePhotoSelect(event)">
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goToStep('step-choice')">Terug</button>
+        <button class="btn btn-primary" onclick="validatePhotos()">Volgende</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4B: Dealer search (dealer path) -->
+  <div class="step" id="step-dealer">
+    <div class="progress"><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot current"></div><div class="progress-dot"></div></div>
+    <div class="card">
+      <h2>Zoek een dealer</h2>
+      <p class="subtitle">Zoek op postcode, plaatsnaam of dealernaam</p>
+      <div class="input-row">
+        <input type="text" id="dealer-search" placeholder="bijv. Amsterdam of 1012AB" oninput="searchDealers()">
+      </div>
+      <div class="dealer-list" id="dealer-list"></div>
+    </div>
+    <div class="card" id="appointment-card" style="display:none">
+      <h3>Kies een datum en tijdvoorkeur</h3>
+      <p class="subtitle">De dealer bevestigt de afspraak per e-mail of telefoon</p>
+      <div class="input-row">
+        <label for="appt-date">Voorkeursdatum</label>
+        <input type="date" id="appt-date" min="">
+      </div>
+      <div class="input-row">
+        <label>Voorkeurstijd</label>
+        <div class="time-slots" id="time-slots">
+          <div class="time-slot" onclick="toggleTimeSlot(this)">Ochtend (9-12u)</div>
+          <div class="time-slot" onclick="toggleTimeSlot(this)">Middag (12-15u)</div>
+          <div class="time-slot" onclick="toggleTimeSlot(this)">Laat (15-17u)</div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row" style="padding: 0 0 16px">
+      <button class="btn btn-secondary" onclick="goToStep('step-choice')">Terug</button>
+      <button class="btn btn-primary" id="dealer-next-btn" onclick="validateDealer()" disabled>Volgende</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: Contact details + consent -->
+  <div class="step" id="step-contact">
+    <div class="progress"><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot current"></div></div>
+    <div class="card">
+      <h2>Uw gegevens</h2>
+      <p class="subtitle">Vul uw contactgegevens in zodat de dealer u kan bereiken</p>
+      <div class="input-row"><label for="contact-name">Naam *</label><input type="text" id="contact-name" placeholder="Volledige naam"></div>
+      <div class="input-row"><label for="contact-email">E-mail *</label><input type="email" id="contact-email" placeholder="uw@email.nl"></div>
+      <div class="input-row"><label for="contact-phone">Telefoon *</label><input type="tel" id="contact-phone" placeholder="06-12345678"></div>
+      <div class="input-row"><label for="contact-postcode">Postcode *</label><input type="text" id="contact-postcode" placeholder="1234AB" maxlength="7"></div>
+      <div class="input-row"><label for="contact-message">Opmerking (optioneel)</label><textarea id="contact-message" rows="3" placeholder="Eventuele opmerkingen..."></textarea></div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="consent-check">
+        <label for="consent-check">Ik geef toestemming om mijn gegevens, inclusief kenteken, foto's en contactgegevens, te delen met de geselecteerde dealer voor het uitbrengen van een inruilvoorstel. <a href="#" onclick="event.preventDefault();alert('Privacybeleid — in een productieversie verwijst deze link naar het volledige privacybeleid van Volkswagen.nl.')">Privacybeleid</a></label>
+      </div>
+
+      <div class="blocked-notice" id="consent-notice">
+        <strong>Let op:</strong> Opslag en verwerking van persoonsgegevens is pas mogelijk nadat de juridische grondslag en DPIA definitief zijn vastgesteld (TX-4.3). Dit prototype simuleert de instemmingsstap.
+      </div>
+
+      <div class="error-text" id="contact-error">Vul alle verplichte velden in en geef toestemming</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="contact-back-btn" onclick="goBackFromContact()">Terug</button>
+        <button class="btn btn-primary" onclick="validateContact()">Versturen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6: Confirmation -->
+  <div class="step" id="step-confirm">
+    <div class="progress"><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot done"></div><div class="progress-dot done"></div></div>
+    <div class="card">
+      <div class="confirmation-box">
+        <div class="check-icon">&#10003;</div>
+        <h2>Uw aanvraag is ontvangen</h2>
+        <p id="confirm-message"></p>
+        <p style="margin-top:16px; font-size:14px; color:var(--vw-gray-500)">U ontvangt een bevestiging per e-mail.</p>
+      </div>
+
+      <div class="summary-section" id="confirm-summary"></div>
+
+      <div class="btn-row" style="justify-content:center; margin-top:24px">
+        <button class="btn btn-primary" onclick="startOver()">Nieuwe aanvraag</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer-banner">
+  Demo build — inputs: Briefing.pdf + Stories_Epics_1-4.md + readiness-review-trade-in.md
+</div>
+
+<script>
+const MOCK_VEHICLES = {
+  'AB123CD': { make: 'Volkswagen', model: 'Golf', type: '1.5 TSI Style', engine: '1.5 TSI 150pk', year: 2021, fuel: 'Benzine', transmission: 'Handgeschakeld', color: 'Oryx Wit', originalPrice: '€ 35.490' },
+  'XY456ZZ': { make: 'Volkswagen', model: 'Tiguan', type: '2.0 TDI Elegance', engine: '2.0 TDI 150pk', year: 2022, fuel: 'Diesel', transmission: 'DSG Automaat', color: 'Dolphin Grey', originalPrice: '€ 48.990' },
+  'NL789BB': { make: 'Volkswagen', model: 'ID.4', type: 'Pro Performance', engine: 'Elektrisch 204pk', year: 2023, fuel: 'Elektrisch', transmission: 'Automaat', color: 'Kings Red', originalPrice: '€ 44.990' },
+  'HH321KK': { make: 'Volkswagen', model: 'Polo', type: '1.0 TSI Life', engine: '1.0 TSI 95pk', year: 2020, fuel: 'Benzine', transmission: 'Handgeschakeld', color: 'Reef Blue', originalPrice: '€ 23.490' },
+  'PP555RR': { make: 'Audi', model: 'A3 Sportback', type: '35 TFSI S-Tronic', engine: '1.5 TFSI 150pk', year: 2021, fuel: 'Benzine', transmission: 'Automaat', color: 'Mythos Black', originalPrice: '€ 38.750' },
+};
+
+const MOCK_DEALERS = [
+  { name: 'Volkswagen Centrum Amsterdam', address: 'Naritaweg 100, 1043 CA Amsterdam', phone: '020-1234567', email: 'info@vw-amsterdam.nl', website: 'vw-amsterdam.nl', dist: '2.1 km' },
+  { name: 'Autobedrijf De Kok', address: 'Kabelweg 50, 1014 BA Amsterdam', phone: '020-2345678', email: 'info@dekok.nl', website: 'dekok-vw.nl', dist: '3.8 km' },
+  { name: 'Volkswagen Van Mossel Haarlem', address: 'Industrieweg 12, 2031 CE Haarlem', phone: '023-3456789', email: 'haarlem@vanmossel.nl', website: 'vanmossel-vw.nl', dist: '18.5 km' },
+  { name: 'Volkswagen Dealer Utrecht', address: 'Proostwetering 28, 3543 AE Utrecht', phone: '030-4567890', email: 'info@vw-utrecht.nl', website: 'vw-utrecht.nl', dist: '35.2 km' },
+  { name: 'Ames Volkswagen Rotterdam', address: 'Aelbrechtsplein 1, 3022 JA Rotterdam', phone: '010-5678901', email: 'info@ames-vw.nl', website: 'ames-vw.nl', dist: '58.0 km' },
+];
+
+const PHOTO_LABELS = [
+  { label: 'Voorkant', hint: 'Recht van voren' },
+  { label: 'Achterkant', hint: 'Recht van achteren' },
+  { label: 'Linkerzijde', hint: 'Volledig zijaanzicht' },
+  { label: 'Rechterzijde', hint: 'Volledig zijaanzicht' },
+  { label: 'Dashboard', hint: 'Stuur en displays' },
+  { label: 'Interieur achter', hint: 'Achterbank' },
+  { label: 'Kofferbak', hint: 'Geopend' },
+  { label: 'Velgen/banden', hint: 'Close-up' },
+];
+
+let state = {
+  vehicle: null,
+  manualEntry: false,
+  mileage: null,
+  path: null, // 'online' | 'dealer'
+  photos: new Array(8).fill(null),
+  selectedDealer: null,
+  apptDate: null,
+  apptSlots: [],
+  contact: {},
+};
+
+let currentPhotoSlot = -1;
+
+// Initialize photo grid
+function initPhotoGrid() {
+  const grid = document.getElementById('photo-grid');
+  grid.innerHTML = '';
+  PHOTO_LABELS.forEach((p, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'photo-slot';
+    slot.dataset.index = i;
+    slot.innerHTML = `<div class="slot-icon">+</div><div>${p.label}</div><div style="font-size:10px;color:#aaa">${p.hint}</div><button class="remove-btn" onclick="event.stopPropagation();removePhoto(${i})">&times;</button>`;
+    slot.onclick = () => { currentPhotoSlot = i; document.getElementById('photo-file-input').click(); };
+    grid.appendChild(slot);
+  });
+}
+
+function goToStep(stepId) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(stepId).classList.add('active');
+  window.scrollTo(0, 0);
+  if (stepId === 'step-mileage') {
+    showVehicleSummary('vehicle-summary-mileage');
+  }
+  if (stepId === 'step-dealer') {
+    const today = new Date();
+    today.setDate(today.getDate() + 1);
+    document.getElementById('appt-date').min = today.toISOString().split('T')[0];
+    searchDealers();
+  }
+  if (stepId === 'step-photos') {
+    initPhotoGrid();
+    updatePhotoDisplay();
+  }
+}
+
+// Plate validation: simple NL-like format
+function isValidPlate(plate) {
+  const cleaned = plate.replace(/[-\s]/g, '').toUpperCase();
+  return /^[A-Z0-9]{6}$/.test(cleaned);
+}
+
+function normalizePlate(plate) {
+  return plate.replace(/[-\s]/g, '').toUpperCase();
+}
+
+function lookupPlate() {
+  const input = document.getElementById('plate-input');
+  const errorEl = document.getElementById('plate-error');
+  const resultEl = document.getElementById('plate-result');
+  const notFoundEl = document.getElementById('plate-not-found');
+  const nextBtn = document.getElementById('plate-next-btn');
+  const lookupBtn = document.getElementById('plate-lookup-btn');
+
+  errorEl.classList.remove('visible');
+  resultEl.style.display = 'none';
+  notFoundEl.style.display = 'none';
+  nextBtn.style.display = 'none';
+
+  const raw = input.value.trim();
+  if (!isValidPlate(raw)) {
+    errorEl.classList.add('visible');
+    return;
+  }
+
+  lookupBtn.innerHTML = '<span class="loading"></span>Zoeken...';
+  lookupBtn.disabled = true;
+
+  setTimeout(() => {
+    lookupBtn.innerHTML = 'Zoek op';
+    lookupBtn.disabled = false;
+
+    const key = normalizePlate(raw);
+    const match = Object.entries(MOCK_VEHICLES).find(([k]) => k === key);
+    if (match) {
+      state.vehicle = match[1];
+      state.manualEntry = false;
+      showVehicleInfo(match[1]);
+      resultEl.style.display = 'block';
+      nextBtn.style.display = 'inline-flex';
+    } else {
+      notFoundEl.style.display = 'block';
+    }
+  }, 800);
+}
+
+function showVehicleInfo(v) {
+  document.getElementById('vehicle-info').innerHTML = `
+    <h3 style="margin-bottom:8px">${v.make} ${v.model}</h3>
+    <dl>
+      <dt>Type</dt><dd>${v.type}</dd>
+      <dt>Motor</dt><dd>${v.engine}</dd>
+      <dt>Bouwjaar</dt><dd>${v.year}</dd>
+      <dt>Brandstof</dt><dd>${v.fuel}</dd>
+      <dt>Transmissie</dt><dd>${v.transmission}</dd>
+      <dt>Kleur</dt><dd>${v.color}</dd>
+      <dt>Nieuwprijs</dt><dd>${v.originalPrice}</dd>
+    </dl>`;
+}
+
+function showVehicleSummary(targetId) {
+  const el = document.getElementById(targetId);
+  if (!state.vehicle) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const v = state.vehicle;
+  el.innerHTML = `<strong>${v.make} ${v.model}</strong> — ${v.type}, ${v.year}`;
+}
+
+function toggleManualEntry() {
+  const fields = document.getElementById('manual-fields');
+  fields.classList.toggle('visible');
+  if (fields.classList.contains('visible')) {
+    const nextBtn = document.getElementById('plate-next-btn');
+    document.getElementById('manual-make').onchange =
+    document.getElementById('manual-model').oninput =
+    document.getElementById('manual-year').oninput = () => {
+      const make = document.getElementById('manual-make').value;
+      const model = document.getElementById('manual-model').value.trim();
+      const year = document.getElementById('manual-year').value;
+      if (make && model && year) {
+        state.vehicle = { make, model, type: 'Handmatig', engine: 'Onbekend', year: parseInt(year), fuel: '-', transmission: '-', color: '-', originalPrice: '-' };
+        state.manualEntry = true;
+        nextBtn.style.display = 'inline-flex';
+      } else {
+        nextBtn.style.display = 'none';
+      }
+    };
+  }
+}
+
+function validateMileage() {
+  const val = parseInt(document.getElementById('mileage-input').value);
+  const err = document.getElementById('mileage-error');
+  if (isNaN(val) || val < 0 || val > 999999) {
+    err.classList.add('visible');
+    return;
+  }
+  err.classList.remove('visible');
+  state.mileage = val;
+  goToStep('step-choice');
+}
+
+function selectChoice(choice) {
+  document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  state.path = choice;
+  setTimeout(() => {
+    if (choice === 'online') goToStep('step-photos');
+    else goToStep('step-dealer');
+  }, 300);
+}
+
+// Photos
+function handlePhotoSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    alert('Bestand te groot. Maximum 10 MB.');
+    return;
+  }
+  if (!['image/jpeg','image/png','image/heic'].includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
+    alert('Ongeldig formaat. Gebruik JPEG, PNG of HEIC.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    state.photos[currentPhotoSlot] = ev.target.result;
+    updatePhotoDisplay();
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function removePhoto(i) {
+  state.photos[i] = null;
+  updatePhotoDisplay();
+}
+
+function updatePhotoDisplay() {
+  const slots = document.querySelectorAll('.photo-slot');
+  let count = 0;
+  slots.forEach((slot, i) => {
+    if (state.photos[i]) {
+      slot.classList.add('filled');
+      if (!slot.querySelector('img')) {
+        const img = document.createElement('img');
+        img.src = state.photos[i];
+        slot.appendChild(img);
+      } else {
+        slot.querySelector('img').src = state.photos[i];
+      }
+      count++;
+    } else {
+      slot.classList.remove('filled');
+      const img = slot.querySelector('img');
+      if (img) img.remove();
+    }
+  });
+  document.getElementById('photo-count').textContent = `${count} van 8 foto's toegevoegd`;
+}
+
+function validatePhotos() {
+  const count = state.photos.filter(p => p !== null).length;
+  const err = document.getElementById('photo-error');
+  if (count < 1) {
+    err.classList.add('visible');
+    return;
+  }
+  err.classList.remove('visible');
+  goToStep('step-contact');
+}
+
+// Dealers
+function searchDealers() {
+  const query = document.getElementById('dealer-search').value.trim().toLowerCase();
+  const list = document.getElementById('dealer-list');
+  const filtered = query.length === 0 ? MOCK_DEALERS : MOCK_DEALERS.filter(d =>
+    d.name.toLowerCase().includes(query) || d.address.toLowerCase().includes(query)
+  );
+  const results = filtered.length > 0 ? filtered : MOCK_DEALERS;
+  list.innerHTML = results.map((d, i) => `
+    <div class="dealer-card" onclick="selectDealer(${MOCK_DEALERS.indexOf(d)})" id="dealer-${MOCK_DEALERS.indexOf(d)}">
+      <div class="dealer-name">${d.name}</div>
+      <div class="dealer-addr">${d.address}</div>
+      <div class="dealer-addr">${d.phone} | ${d.email}</div>
+      <div class="dealer-dist">${d.dist}</div>
+    </div>`).join('');
+}
+
+function selectDealer(idx) {
+  state.selectedDealer = MOCK_DEALERS[idx];
+  document.querySelectorAll('.dealer-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('dealer-' + idx).classList.add('selected');
+  document.getElementById('appointment-card').style.display = 'block';
+  updateDealerNext();
+}
+
+function toggleTimeSlot(el) {
+  el.classList.toggle('selected');
+  updateDealerNext();
+}
+
+function updateDealerNext() {
+  const hasDealer = state.selectedDealer !== null;
+  const hasDate = document.getElementById('appt-date').value !== '';
+  const hasSlot = document.querySelectorAll('.time-slot.selected').length > 0;
+  document.getElementById('dealer-next-btn').disabled = !(hasDealer && hasDate && hasSlot);
+}
+document.addEventListener('input', (e) => { if (e.target.id === 'appt-date') updateDealerNext(); });
+
+function validateDealer() {
+  if (!state.selectedDealer) return;
+  state.apptDate = document.getElementById('appt-date').value;
+  state.apptSlots = Array.from(document.querySelectorAll('.time-slot.selected')).map(s => s.textContent);
+  goToStep('step-contact');
+}
+
+function goBackFromContact() {
+  if (state.path === 'online') goToStep('step-photos');
+  else goToStep('step-dealer');
+}
+
+function validateContact() {
+  const name = document.getElementById('contact-name').value.trim();
+  const email = document.getElementById('contact-email').value.trim();
+  const phone = document.getElementById('contact-phone').value.trim();
+  const postcode = document.getElementById('contact-postcode').value.trim();
+  const consent = document.getElementById('consent-check').checked;
+  const err = document.getElementById('contact-error');
+
+  if (!name || !email || !phone || !postcode || !consent) {
+    err.classList.add('visible');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = 'Voer een geldig e-mailadres in';
+    err.classList.add('visible');
+    return;
+  }
+  err.classList.remove('visible');
+  state.contact = { name, email, phone, postcode, message: document.getElementById('contact-message').value.trim() };
+  showConfirmation();
+}
+
+function showConfirmation() {
+  const v = state.vehicle;
+  const isOnline = state.path === 'online';
+  const photoCount = state.photos.filter(p => p !== null).length;
+
+  document.getElementById('confirm-message').textContent = isOnline
+    ? 'Uw inruilaanvraag is succesvol ingediend. De dealer neemt contact met u op met een voorstel.'
+    : `Uw afspraak bij ${state.selectedDealer.name} is aangevraagd. De dealer bevestigt uw afspraak per e-mail of telefoon.`;
+
+  let summaryHTML = `
+    <h3>Samenvatting</h3>
+    <div class="summary-row"><span class="summary-label">Voertuig</span><span class="summary-value">${v.make} ${v.model} (${v.year})</span></div>
+    <div class="summary-row"><span class="summary-label">Kilometerstand</span><span class="summary-value">${state.mileage.toLocaleString('nl-NL')} km</span></div>
+    <div class="summary-row"><span class="summary-label">Type aanvraag</span><span class="summary-value">${isOnline ? 'Online inruilvoorstel' : 'Taxatie bij dealer'}</span></div>`;
+
+  if (isOnline) {
+    summaryHTML += `<div class="summary-row"><span class="summary-label">Foto's</span><span class="summary-value">${photoCount} van 8 toegevoegd</span></div>`;
+  } else {
+    summaryHTML += `
+      <div class="summary-row"><span class="summary-label">Dealer</span><span class="summary-value">${state.selectedDealer.name}</span></div>
+      <div class="summary-row"><span class="summary-label">Voorkeursdatum</span><span class="summary-value">${new Date(state.apptDate).toLocaleDateString('nl-NL', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}</span></div>
+      <div class="summary-row"><span class="summary-label">Tijdvoorkeur</span><span class="summary-value">${state.apptSlots.join(', ')}</span></div>`;
+  }
+
+  summaryHTML += `
+    <div class="summary-row"><span class="summary-label">Naam</span><span class="summary-value">${state.contact.name}</span></div>
+    <div class="summary-row"><span class="summary-label">E-mail</span><span class="summary-value">${state.contact.email}</span></div>
+    <div class="summary-row"><span class="summary-label">Telefoon</span><span class="summary-value">${state.contact.phone}</span></div>`;
+
+  document.getElementById('confirm-summary').innerHTML = summaryHTML;
+  goToStep('step-confirm');
+}
+
+function startOver() {
+  state = { vehicle: null, manualEntry: false, mileage: null, path: null, photos: new Array(8).fill(null), selectedDealer: null, apptDate: null, apptSlots: [], contact: {} };
+  document.getElementById('plate-input').value = '';
+  document.getElementById('mileage-input').value = '';
+  document.getElementById('plate-result').style.display = 'none';
+  document.getElementById('plate-not-found').style.display = 'none';
+  document.getElementById('plate-next-btn').style.display = 'none';
+  document.getElementById('contact-name').value = '';
+  document.getElementById('contact-email').value = '';
+  document.getElementById('contact-phone').value = '';
+  document.getElementById('contact-postcode').value = '';
+  document.getElementById('contact-message').value = '';
+  document.getElementById('consent-check').checked = false;
+  document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+  goToStep('step-plate');
+}
+
+// Plate input auto-format
+document.getElementById('plate-input').addEventListener('input', function() {
+  let v = this.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (v.length > 6) v = v.slice(0, 6);
+  if (v.length >= 4) v = v.slice(0,2) + '-' + v.slice(2,5) + '-' + v.slice(5);
+  else if (v.length >= 2) v = v.slice(0,2) + '-' + v.slice(2);
+  this.value = v;
+});
+
+// Init
+initPhotoGrid();
+searchDealers();
+</script>
+
+</body>
+</html>

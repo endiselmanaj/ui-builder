@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volkswagen Trade-in Value Request</title>
+<style>
+  :root {
+    --vw-blue: #001E50;
+    --vw-light-blue: #00B0F0;
+    --vw-white: #FFFFFF;
+    --vw-gray: #DFE4E8;
+    --vw-dark-gray: #6A767D;
+    --vw-light-gray: #F2F4F5;
+    --vw-green: #4CAF50;
+    --vw-red: #D32F2F;
+    --vw-orange: #FF9800;
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--vw-light-gray);
+    color: #333;
+    min-height: 100vh;
+    padding-bottom: 48px;
+  }
+
+  header {
+    background: var(--vw-blue);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  header svg { width: 48px; height: 48px; }
+
+  header h1 { font-size: 20px; font-weight: 500; }
+
+  .container {
+    max-width: 640px;
+    margin: 24px auto;
+    padding: 0 16px;
+  }
+
+  .card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 32px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 16px;
+  }
+
+  .card h2 {
+    font-size: 22px;
+    color: var(--vw-blue);
+    margin-bottom: 8px;
+  }
+
+  .card p.subtitle {
+    color: var(--vw-dark-gray);
+    margin-bottom: 24px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .stepper {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .step-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--vw-gray);
+    transition: background 0.2s;
+  }
+
+  .step-dot.active { background: var(--vw-blue); }
+  .step-dot.done { background: var(--vw-green); }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vw-dark-gray);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  input[type="text"], input[type="number"], input[type="email"], input[type="tel"],
+  select, textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--vw-gray);
+    border-radius: var(--radius);
+    font-size: 16px;
+    margin-bottom: 16px;
+    outline: none;
+    transition: border 0.2s;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--vw-light-blue);
+  }
+
+  .plate-input {
+    background: #FDE74C;
+    border: 2px solid #333;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 14px;
+    border-radius: 6px;
+  }
+
+  .plate-input::placeholder {
+    color: #999;
+    letter-spacing: 1px;
+    font-weight: 400;
+    font-size: 16px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 28px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+    text-decoration: none;
+  }
+
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--vw-blue);
+    color: white;
+    width: 100%;
+  }
+
+  .btn-primary:hover:not(:disabled) { background: #002a6e; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--vw-blue);
+    border: 2px solid var(--vw-blue);
+    width: 100%;
+  }
+
+  .btn-secondary:hover:not(:disabled) { background: rgba(0,30,80,0.05); }
+
+  .btn-back {
+    background: transparent;
+    color: var(--vw-dark-gray);
+    padding: 8px 0;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  .btn-back:hover { color: var(--vw-blue); }
+
+  .vehicle-card {
+    background: var(--vw-light-gray);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .vehicle-card h3 {
+    font-size: 18px;
+    color: var(--vw-blue);
+    margin-bottom: 12px;
+  }
+
+  .vehicle-detail {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+
+  .vehicle-detail:last-child { border-bottom: none; }
+
+  .vehicle-detail span:first-child { color: var(--vw-dark-gray); }
+  .vehicle-detail span:last-child { font-weight: 600; }
+
+  .error-msg {
+    color: var(--vw-red);
+    font-size: 13px;
+    margin-top: -12px;
+    margin-bottom: 12px;
+  }
+
+  .choice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .choice-card {
+    border: 2px solid var(--vw-gray);
+    border-radius: var(--radius);
+    padding: 20px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .choice-card:hover { border-color: var(--vw-light-blue); }
+
+  .choice-card.selected {
+    border-color: var(--vw-blue);
+    background: rgba(0,30,80,0.03);
+  }
+
+  .choice-card .icon { font-size: 32px; margin-bottom: 8px; }
+  .choice-card h4 { font-size: 14px; color: var(--vw-blue); margin-bottom: 4px; }
+  .choice-card p { font-size: 12px; color: var(--vw-dark-gray); }
+
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .photo-slot {
+    aspect-ratio: 4/3;
+    border: 2px dashed var(--vw-gray);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .photo-slot:hover { border-color: var(--vw-light-blue); background: rgba(0,176,240,0.03); }
+
+  .photo-slot.filled {
+    border-style: solid;
+    border-color: var(--vw-green);
+  }
+
+  .photo-slot .slot-label {
+    font-size: 10px;
+    color: var(--vw-dark-gray);
+    text-align: center;
+    padding: 2px 4px;
+  }
+
+  .photo-slot .slot-icon { font-size: 20px; margin-bottom: 2px; }
+
+  .photo-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  .photo-slot .remove-photo {
+    position: absolute;
+    top: 2px; right: 2px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px; height: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .photo-slot.filled:hover .remove-photo { display: flex; }
+
+  .info-banner {
+    background: #FFF3E0;
+    border-left: 4px solid var(--vw-orange);
+    padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #5D4037;
+  }
+
+  .blocked-banner {
+    background: #FFEBEE;
+    border-left: 4px solid var(--vw-red);
+    padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #B71C1C;
+  }
+
+  .success-banner {
+    background: #E8F5E9;
+    border-left: 4px solid var(--vw-green);
+    padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #1B5E20;
+  }
+
+  .dealer-list { margin-bottom: 20px; }
+
+  .dealer-item {
+    border: 1px solid var(--vw-gray);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .dealer-item:hover { border-color: var(--vw-light-blue); }
+  .dealer-item.selected { border-color: var(--vw-blue); background: rgba(0,30,80,0.02); }
+
+  .dealer-item h4 { color: var(--vw-blue); margin-bottom: 4px; }
+  .dealer-item p { font-size: 13px; color: var(--vw-dark-gray); margin-bottom: 2px; }
+
+  .time-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .time-slot {
+    padding: 10px;
+    border: 1px solid var(--vw-gray);
+    border-radius: var(--radius);
+    text-align: center;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+
+  .time-slot:hover { border-color: var(--vw-light-blue); }
+  .time-slot.selected { border-color: var(--vw-blue); background: rgba(0,30,80,0.05); font-weight: 600; }
+  .time-slot.unavailable { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; }
+
+  .summary-section {
+    border-bottom: 1px solid var(--vw-gray);
+    padding: 16px 0;
+  }
+
+  .summary-section:last-child { border-bottom: none; }
+  .summary-section h4 { color: var(--vw-blue); margin-bottom: 8px; font-size: 14px; }
+
+  .consent-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .consent-row input[type="checkbox"] {
+    width: auto;
+    margin-top: 3px;
+    flex-shrink: 0;
+  }
+
+  .photos-review {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .photos-review img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+
+  .dealer-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .dealer-photo-card {
+    border: 1px solid var(--vw-gray);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .dealer-photo-card img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+  }
+
+  .dealer-photo-card .photo-meta {
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--vw-dark-gray);
+  }
+
+  .retention-bar {
+    height: 4px;
+    background: var(--vw-gray);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+
+  .retention-bar .fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--vw-dark-gray);
+  }
+
+  .loading .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--vw-gray);
+    border-top-color: var(--vw-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .input-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,30,80,0.85);
+    color: rgba(255,255,255,0.7);
+    text-align: center;
+    padding: 8px 16px;
+    font-size: 11px;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+
+  .tab-bar {
+    display: flex;
+    border-bottom: 2px solid var(--vw-gray);
+    margin-bottom: 20px;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--vw-dark-gray);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+
+  .tab:hover { color: var(--vw-blue); }
+  .tab.active { color: var(--vw-blue); border-bottom-color: var(--vw-blue); }
+
+  @media (max-width: 480px) {
+    .choice-grid { grid-template-columns: 1fr; }
+    .photo-grid { grid-template-columns: repeat(2, 1fr); }
+    .time-slots { grid-template-columns: repeat(2, 1fr); }
+    .photos-review { grid-template-columns: repeat(2, 1fr); }
+    .dealer-photos-grid { grid-template-columns: repeat(2, 1fr); }
+    .card { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg viewBox="0 0 64 64" fill="none">
+    <circle cx="32" cy="32" r="30" stroke="white" stroke-width="2.5"/>
+    <text x="32" y="38" text-anchor="middle" fill="white" font-size="18" font-weight="bold" font-family="sans-serif">VW</text>
+  </svg>
+  <h1>What is your car worth?</h1>
+</header>
+
+<div class="container" id="app"></div>
+
+<div class="input-banner">
+  Demo build &mdash; inputs: Briefing.pdf + Stories_Epics_1-4.md
+</div>
+
+<script>
+const MOCK_VEHICLES = {
+  'AB123C': { make: 'Volkswagen', model: 'Golf', type: 'Hatchback 1.5 TSI', engine: '1.5 TSI 150 pk', year: 2020, fuel: 'Petrol', transmission: 'DSG Automatic', color: 'Deep Black', originalPrice: 34950 },
+  'XY789Z': { make: 'Volkswagen', model: 'Tiguan', type: 'SUV 2.0 TDI', engine: '2.0 TDI 150 pk', year: 2019, fuel: 'Diesel', transmission: 'Manual', color: 'Pure White', originalPrice: 42500 },
+  'NL456D': { make: 'Volkswagen', model: 'Polo', type: 'Hatchback 1.0 TSI', engine: '1.0 TSI 95 pk', year: 2021, fuel: 'Petrol', transmission: 'Manual', color: 'Reef Blue', originalPrice: 24800 },
+  'KK321E': { make: 'Volkswagen', model: 'ID.4', type: 'SUV Electric', engine: 'Electric 204 pk', year: 2022, fuel: 'Electric', transmission: 'Automatic', color: 'Moonstone Grey', originalPrice: 49990 },
+  'HH555F': { make: 'Volkswagen', model: 'Passat', type: 'Variant 1.5 TSI', engine: '1.5 TSI 150 pk', year: 2021, fuel: 'Petrol', transmission: 'DSG Automatic', color: 'Oryx White', originalPrice: 39800 },
+};
+
+const MOCK_DEALERS = [
+  { id: 1, name: 'Volkswagen Centrum Amsterdam', address: 'Wibautstraat 224, 1091 GS Amsterdam', phone: '020-555-0100', email: 'info@vw-amsterdam.nl', website: 'vw-amsterdam.nl', distance: '2.1 km' },
+  { id: 2, name: 'Volkswagen De Bilt', address: 'Utrechtseweg 310, 3731 GP De Bilt', phone: '030-555-0200', email: 'info@vw-debilt.nl', website: 'vw-debilt.nl', distance: '5.8 km' },
+  { id: 3, name: 'Ames Volkswagen Haarlem', address: 'Schipholweg 90, 2034 LD Haarlem', phone: '023-555-0300', email: 'service@ames-vw.nl', website: 'ames-vw.nl', distance: '12.3 km' },
+];
+
+const PHOTO_VIEWS = [
+  'Front', 'Rear', 'Left side', 'Right side',
+  'Dashboard', 'Front seats', 'Rear seats', 'Odometer'
+];
+
+const state = {
+  step: 'plate',
+  plate: '',
+  vehicle: null,
+  mileage: '',
+  path: null,
+  photos: Array(8).fill(null),
+  dealer: null,
+  appointmentDate: '',
+  appointmentTime: null,
+  contactName: '',
+  contactEmail: '',
+  contactPhone: '',
+  consent: { storage: false, share: false, privacy: false },
+  dealerViewTab: 'requests',
+  submitted: false,
+  errors: {},
+};
+
+const AVAILABLE_TIMES = ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'];
+const UNAVAILABLE = ['10:00','13:00','15:30'];
+
+function isValidDutchPlate(p) {
+  const cleaned = p.replace(/[-\s]/g, '').toUpperCase();
+  return /^[A-Z0-9]{5,8}$/.test(cleaned);
+}
+
+function render() {
+  const app = document.getElementById('app');
+  const steps = ['plate','mileage','choice','photos','dealer-search','dealer-slot','summary','confirmation','dealer-view'];
+  const stepIndex = steps.indexOf(state.step);
+
+  let html = '';
+
+  // Stepper (only for customer flow, not dealer view)
+  if (state.step !== 'dealer-view') {
+    const customerSteps = ['plate','mileage','choice','photos','dealer-search','dealer-slot','summary','confirmation'];
+    const activeIdx = customerSteps.indexOf(state.step);
+    if (activeIdx >= 0 && activeIdx < 7) {
+      html += '<div class="stepper">';
+      for (let i = 0; i < 7; i++) {
+        const cls = i < activeIdx ? 'done' : i === activeIdx ? 'active' : '';
+        html += `<div class="step-dot ${cls}"></div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  switch (state.step) {
+    case 'plate': html += renderPlate(); break;
+    case 'plate-loading': html += renderPlateLoading(); break;
+    case 'mileage': html += renderMileage(); break;
+    case 'choice': html += renderChoice(); break;
+    case 'photos': html += renderPhotos(); break;
+    case 'dealer-search': html += renderDealerSearch(); break;
+    case 'dealer-slot': html += renderDealerSlot(); break;
+    case 'summary': html += renderSummary(); break;
+    case 'confirmation': html += renderConfirmation(); break;
+    case 'dealer-view': html += renderDealerView(); break;
+  }
+
+  app.innerHTML = html;
+  bindEvents();
+}
+
+function renderPlate() {
+  return `
+    <div class="card">
+      <h2>Enter your license plate</h2>
+      <p class="subtitle">We'll look up your vehicle data automatically using the Dutch Vehicle API so you don't have to enter it manually.</p>
+      <label for="plate">License plate</label>
+      <input type="text" id="plate" class="plate-input" placeholder="e.g. AB-123-C"
+        value="${state.plate}" maxlength="10">
+      ${state.errors.plate ? `<div class="error-msg">${state.errors.plate}</div>` : ''}
+      <div class="info-banner">
+        <strong>Demo plates:</strong> AB123C, XY789Z, NL456D, KK321E, HH555F. Any other valid format will simulate a "not found" response.
+      </div>
+      <button class="btn btn-primary" id="lookup-btn">Look up vehicle</button>
+    </div>
+  `;
+}
+
+function renderPlateLoading() {
+  return `
+    <div class="card">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Looking up vehicle data...</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderMileage() {
+  return `
+    <div class="card">
+      <button class="btn btn-back" id="back-btn">&larr; Back</button>
+      <h2>Your vehicle</h2>
+      <div class="vehicle-card">
+        <h3>${state.vehicle.make} ${state.vehicle.model}</h3>
+        <div class="vehicle-detail"><span>Type</span><span>${state.vehicle.type}</span></div>
+        <div class="vehicle-detail"><span>Engine</span><span>${state.vehicle.engine}</span></div>
+        <div class="vehicle-detail"><span>Year</span><span>${state.vehicle.year}</span></div>
+        <div class="vehicle-detail"><span>Fuel</span><span>${state.vehicle.fuel}</span></div>
+        <div class="vehicle-detail"><span>Transmission</span><span>${state.vehicle.transmission}</span></div>
+        <div class="vehicle-detail"><span>Color</span><span>${state.vehicle.color}</span></div>
+        <div class="vehicle-detail"><span>Original price</span><span>&euro;${state.vehicle.originalPrice.toLocaleString()}</span></div>
+      </div>
+      <label for="mileage">Current mileage (km)</label>
+      <input type="number" id="mileage" placeholder="e.g. 45000" value="${state.mileage}" min="0" max="500000">
+      ${state.errors.mileage ? `<div class="error-msg">${state.errors.mileage}</div>` : ''}
+      <button class="btn btn-primary" id="mileage-btn">Continue</button>
+    </div>
+  `;
+}
+
+function renderChoice() {
+  return `
+    <div class="card">
+      <button class="btn btn-back" id="back-btn">&larr; Back</button>
+      <h2>How would you like to get your trade-in value?</h2>
+      <p class="subtitle">Choose the option that suits you best.</p>
+      <div class="choice-grid">
+        <div class="choice-card ${state.path === 'online' ? 'selected' : ''}" data-path="online">
+          <div class="icon">&#128247;</div>
+          <h4>Online trade-in offer</h4>
+          <p>Take 8 photos and get an offer without visiting a dealer</p>
+        </div>
+        <div class="choice-card ${state.path === 'dealer' ? 'selected' : ''}" data-path="dealer">
+          <div class="icon">&#127970;</div>
+          <h4>Appraisal at a dealer</h4>
+          <p>Schedule an appointment for an in-person assessment</p>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="choice-btn" ${!state.path ? 'disabled' : ''}>Continue</button>
+    </div>
+  `;
+}
+
+function renderPhotos() {
+  const filledCount = state.photos.filter(p => p).length;
+  return `
+    <div class="card">
+      <button class="btn btn-back" id="back-btn">&larr; Back</button>
+      <h2>Take 8 photos of your car</h2>
+      <p class="subtitle">Provide photos of each view below. These help assess your vehicle's condition. (${filledCount}/8 complete)</p>
+      <div class="info-banner">
+        <strong>Note (TX-2.1 NEEDS INFO):</strong> The exact 8 required views and format/size rules are not yet specified. We've assumed standard interior and exterior views as listed below. Click any slot to simulate uploading.
+      </div>
+      <div class="photo-grid">
+        ${PHOTO_VIEWS.map((view, i) => `
+          <div class="photo-slot ${state.photos[i] ? 'filled' : ''}" data-photo-index="${i}">
+            ${state.photos[i]
+              ? `<img src="${state.photos[i]}" alt="${view}"><button class="remove-photo" data-remove="${i}">&times;</button>`
+              : `<div class="slot-icon">&#128247;</div><div class="slot-label">${view}</div>`
+            }
+          </div>
+        `).join('')}
+      </div>
+      ${state.errors.photos ? `<div class="error-msg">${state.errors.photos}</div>` : ''}
+      <button class="btn btn-primary" id="photos-btn">Continue to review</button>
+    </div>
+  `;
+}
+
+function renderDealerSearch() {
+  return `
+    <div class="card">
+      <button class="btn btn-back" id="back-btn">&larr; Back</button>
+      <h2>Find a Volkswagen dealer</h2>
+      <p class="subtitle">Search by town or dealer name to find a dealer near you. Results are from the iDNAW API (mocked).</p>
+      <label for="dealer-search">Town or dealer name</label>
+      <input type="text" id="dealer-search" placeholder="e.g. Amsterdam" value="">
+      <div class="dealer-list">
+        ${MOCK_DEALERS.map(d => `
+          <div class="dealer-item ${state.dealer && state.dealer.id === d.id ? 'selected' : ''}" data-dealer-id="${d.id}">
+            <h4>${d.name}</h4>
+            <p>${d.address}</p>
+            <p>${d.phone} &middot; ${d.email}</p>
+            <p style="font-size:12px; color: var(--vw-light-blue);">${d.distance} away</p>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn btn-primary" id="dealer-continue-btn" ${!state.dealer ? 'disabled' : ''}>Select dealer &amp; choose time</button>
+    </div>
+  `;
+}
+
+function renderDealerSlot() {
+  const d = state.dealer;
+  return `
+    <div class="card">
+      <button class="btn btn-back" id="back-btn">&larr; Back</button>
+      <h2>Choose date &amp; time</h2>
+      <p class="subtitle">Book an appointment at ${d.name}.</p>
+      <div class="info-banner">
+        <strong>Note (TX-3.2 NEEDS INFO):</strong> The source of dealer slot availability is undefined. We simulate some slots as unavailable.
+      </div>
+      <label for="appt-date">Date</label>
+      <input type="text" id="appt-date" placeholder="Select a date" value="${state.appointmentDate}"
+        onfocus="this.type='date'" onblur="if(!this.value)this.type='text'" min="${new Date().toISOString().split('T')[0]}">
+      <label>Available times</label>
+      <div class="time-slots">
+        ${AVAILABLE_TIMES.map(t => {
+          const unavail = UNAVAILABLE.includes(t);
+          const sel = state.appointmentTime === t;
+          return `<div class="time-slot ${unavail ? 'unavailable' : ''} ${sel ? 'selected' : ''}"
+            data-time="${t}" ${unavail ? '' : ''}>${t}</div>`;
+        }).join('')}
+      </div>
+      ${state.errors.appointment ? `<div class="error-msg">${state.errors.appointment}</div>` : ''}
+      <button class="btn btn-primary" id="slot-continue-btn">Continue to review</button>
+    </div>
+  `;
+}
+
+function renderSummary() {
+  const isOnline = state.path === 'online';
+  const allConsented = state.consent.storage && state.consent.share && state.consent.privacy;
+  return `
+    <div class="card">
+      <button class="btn btn-back" id="back-btn">&larr; Back</button>
+      <h2>Review &amp; submit</h2>
+
+      <div class="blocked-banner">
+        <strong>TX-4.3 BLOCKED:</strong> Submission that stores personal data cannot go live until the consent model and lawful basis are agreed. This prototype shows the consent UI but treats it as a non-binding preview. The submit button is functional for demo purposes, but a production build would block until TX-4.3 is resolved.
+      </div>
+
+      <div class="summary-section">
+        <h4>Vehicle</h4>
+        <div class="vehicle-detail"><span>Plate</span><span>${state.plate.toUpperCase()}</span></div>
+        <div class="vehicle-detail"><span>Vehicle</span><span>${state.vehicle.make} ${state.vehicle.model} ${state.vehicle.type}</span></div>
+        <div class="vehicle-detail"><span>Mileage</span><span>${parseInt(state.mileage).toLocaleString()} km</span></div>
+      </div>
+
+      ${isOnline ? `
+        <div class="summary-section">
+          <h4>Photos (${state.photos.filter(p=>p).length}/8)</h4>
+          <div class="photos-review">
+            ${state.photos.filter(p=>p).map(p => `<img src="${p}" alt="Photo">`).join('')}
+          </div>
+        </div>
+      ` : `
+        <div class="summary-section">
+          <h4>Dealer appointment</h4>
+          <div class="vehicle-detail"><span>Dealer</span><span>${state.dealer.name}</span></div>
+          <div class="vehicle-detail"><span>Date</span><span>${state.appointmentDate}</span></div>
+          <div class="vehicle-detail"><span>Time</span><span>${state.appointmentTime}</span></div>
+        </div>
+      `}
+
+      <div class="summary-section">
+        <h4>Your details</h4>
+        <label for="contact-name">Full name</label>
+        <input type="text" id="contact-name" placeholder="Your name" value="${state.contactName}">
+        <label for="contact-email">Email</label>
+        <input type="email" id="contact-email" placeholder="you@example.com" value="${state.contactEmail}">
+        <label for="contact-phone">Phone number</label>
+        <input type="tel" id="contact-phone" placeholder="+31 6 12345678" value="${state.contactPhone}">
+        ${state.errors.contact ? `<div class="error-msg">${state.errors.contact}</div>` : ''}
+      </div>
+
+      <div class="summary-section">
+        <h4>Consent</h4>
+        <div class="consent-row">
+          <input type="checkbox" id="consent-storage" ${state.consent.storage ? 'checked' : ''}>
+          <label for="consent-storage" style="text-transform:none;font-weight:normal;font-size:13px;">I consent to the storage of my license plate, photos, and contact data for the purpose of this trade-in request.</label>
+        </div>
+        <div class="consent-row">
+          <input type="checkbox" id="consent-share" ${state.consent.share ? 'checked' : ''}>
+          <label for="consent-share" style="text-transform:none;font-weight:normal;font-size:13px;">I consent to sharing my vehicle data with buyers on the trading platform for the purpose of obtaining bids.</label>
+        </div>
+        <div class="consent-row">
+          <input type="checkbox" id="consent-privacy" ${state.consent.privacy ? 'checked' : ''}>
+          <label for="consent-privacy" style="text-transform:none;font-weight:normal;font-size:13px;">I have read and accept the privacy policy.</label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="submit-btn" ${!allConsented ? 'disabled' : ''}>Submit trade-in request</button>
+      ${!allConsented ? '<div class="error-msg" style="margin-top:8px;text-align:center;">All consent checkboxes must be checked to submit.</div>' : ''}
+    </div>
+  `;
+}
+
+function renderConfirmation() {
+  const isOnline = state.path === 'online';
+  return `
+    <div class="card" style="text-align:center;">
+      <div style="font-size:64px;margin-bottom:16px;">&#9989;</div>
+      <h2>Request submitted</h2>
+      <p class="subtitle" style="margin-bottom:24px;">
+        ${isOnline
+          ? 'Your trade-in request has been received. A dealer will review your photos and vehicle data, forward it to the trading platform for bids, and contact you with an offer via email.'
+          : `Your appointment at <strong>${state.dealer.name}</strong> is booked for <strong>${state.appointmentDate}</strong> at <strong>${state.appointmentTime}</strong>. The dealer will assess your vehicle in person.`
+        }
+      </p>
+      <div class="vehicle-card" style="text-align:left;">
+        <h3>Request #TX-${Math.floor(Math.random()*9000)+1000}</h3>
+        <div class="vehicle-detail"><span>Status</span><span style="color:var(--vw-green);">New</span></div>
+        <div class="vehicle-detail"><span>Vehicle</span><span>${state.vehicle.make} ${state.vehicle.model}</span></div>
+        <div class="vehicle-detail"><span>Mileage</span><span>${parseInt(state.mileage).toLocaleString()} km</span></div>
+        <div class="vehicle-detail"><span>Path</span><span>${isOnline ? 'Online offer' : 'Dealer appraisal'}</span></div>
+      </div>
+      <div class="info-banner" style="text-align:left;">
+        <strong>What happens next:</strong> The dealer forwards your request to the trading platform. Buyers place bids. The dealer reviews the bids and contacts you with an offer by email. You can respond by email or schedule a follow-up visit.
+      </div>
+      <button class="btn btn-primary" id="restart-btn" style="margin-top:8px;">Start a new request</button>
+      <button class="btn btn-secondary" id="dealer-view-btn" style="margin-top:8px;">View dealer dashboard (demo)</button>
+    </div>
+  `;
+}
+
+function renderDealerView() {
+  const request = {
+    id: 'TX-' + (Math.floor(Math.random()*9000)+1000),
+    plate: state.plate.toUpperCase(),
+    vehicle: state.vehicle,
+    mileage: state.mileage,
+    photos: state.photos.filter(p => p),
+    status: 'new',
+    submittedAt: new Date().toISOString().split('T')[0],
+    retentionDays: 180,
+    daysStored: Math.floor(Math.random() * 30) + 1,
+  };
+
+  return `
+    <div class="card">
+      <button class="btn btn-back" id="back-btn">&larr; Back to customer view</button>
+      <h2>Dealer Dashboard</h2>
+      <p class="subtitle">TX-4.1: View submitted trade-in requests and photos. TX-4.2: Photos auto-delete after 6 months.</p>
+
+      <div class="tab-bar">
+        <div class="tab ${state.dealerViewTab === 'requests' ? 'active' : ''}" data-tab="requests">Requests</div>
+        <div class="tab ${state.dealerViewTab === 'photos' ? 'active' : ''}" data-tab="photos">Photo Storage</div>
+      </div>
+
+      ${state.dealerViewTab === 'requests' ? `
+        <div class="dealer-item selected" style="cursor:default;">
+          <h4>${request.vehicle.make} ${request.vehicle.model} &mdash; ${request.plate}</h4>
+          <p>${request.vehicle.type} &middot; ${parseInt(request.mileage).toLocaleString()} km</p>
+          <p>Submitted: ${request.submittedAt} &middot; Status: <span style="color:var(--vw-green);font-weight:600;">New</span></p>
+        </div>
+
+        ${request.photos.length > 0 ? `
+          <h4 style="margin:16px 0 8px;color:var(--vw-blue);">Submitted photos</h4>
+          <div class="photos-review" style="margin-bottom:20px;">
+            ${request.photos.map(p => `<img src="${p}" alt="Vehicle photo">`).join('')}
+          </div>
+        ` : '<div class="info-banner">No photos submitted (dealer appraisal path).</div>'}
+
+        <button class="btn btn-primary" id="forward-btn">Forward to trading platform</button>
+        <div id="forward-result"></div>
+      ` : `
+        <div class="info-banner">
+          <strong>TX-4.2 Retention policy:</strong> Photos are automatically deleted after 6 months (180 days) from upload. Deletions are logged for audit purposes.
+        </div>
+
+        ${request.photos.length > 0 ? `
+          <div class="dealer-photos-grid">
+            ${request.photos.map((p, i) => {
+              const daysLeft = 180 - request.daysStored;
+              const pct = Math.round((request.daysStored / 180) * 100);
+              const barColor = pct > 80 ? 'var(--vw-red)' : pct > 50 ? 'var(--vw-orange)' : 'var(--vw-green)';
+              return `
+                <div class="dealer-photo-card">
+                  <img src="${p}" alt="Photo ${i+1}">
+                  <div class="photo-meta">
+                    ${PHOTO_VIEWS[i] || 'Photo ' + (i+1)}<br>
+                    ${daysLeft} days remaining
+                    <div class="retention-bar"><div class="fill" style="width:${pct}%;background:${barColor};"></div></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : '<div class="info-banner">No photos stored for this request.</div>'}
+
+        <div class="success-banner">
+          Cleanup job: Next run checks for photos older than 180 days. Deletions are permanent and recorded in the audit log.
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function generateMockPhoto(viewName) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 240;
+  const ctx = canvas.getContext('2d');
+
+  const colors = ['#4A90D9','#7B68EE','#20B2AA','#DAA520','#CD853F','#708090','#9370DB','#5F9EA0'];
+  const idx = PHOTO_VIEWS.indexOf(viewName);
+  ctx.fillStyle = colors[idx % colors.length];
+  ctx.fillRect(0, 0, 320, 240);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath();
+  ctx.arc(160, 120, 80, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 16px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(viewName, 160, 116);
+  ctx.font = '12px sans-serif';
+  ctx.fillText('(simulated photo)', 160, 136);
+
+  return canvas.toDataURL('image/jpeg', 0.7);
+}
+
+function bindEvents() {
+  const $ = id => document.getElementById(id);
+
+  if ($('lookup-btn')) {
+    $('lookup-btn').addEventListener('click', () => {
+      const raw = ($('plate')?.value || '').trim();
+      state.plate = raw;
+      state.errors = {};
+      if (!raw) {
+        state.errors.plate = 'Please enter a license plate.';
+        render();
+        return;
+      }
+      if (!isValidDutchPlate(raw)) {
+        state.errors.plate = 'Invalid license plate format. Please correct it and try again.';
+        render();
+        return;
+      }
+      state.step = 'plate-loading';
+      render();
+      setTimeout(() => {
+        const key = raw.replace(/[-\s]/g, '').toUpperCase();
+        const vehicle = MOCK_VEHICLES[key];
+        if (vehicle) {
+          state.vehicle = vehicle;
+          state.step = 'mileage';
+        } else {
+          state.vehicle = null;
+          state.step = 'plate';
+          state.errors.plate = 'No vehicle found for this license plate. Please check and try again, or contact a dealer for assistance.';
+        }
+        render();
+      }, 1200);
+    });
+    $('plate')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('lookup-btn').click(); });
+  }
+
+  if ($('mileage-btn')) {
+    $('mileage-btn').addEventListener('click', () => {
+      const val = $('mileage')?.value;
+      state.mileage = val;
+      state.errors = {};
+      if (!val || isNaN(val)) {
+        state.errors.mileage = 'Please enter a valid mileage.';
+        render();
+        return;
+      }
+      const km = parseInt(val);
+      if (km < 0 || km > 500000) {
+        state.errors.mileage = 'Mileage must be between 0 and 500,000 km.';
+        render();
+        return;
+      }
+      state.step = 'choice';
+      render();
+    });
+  }
+
+  if ($('choice-btn')) {
+    $('choice-btn').addEventListener('click', () => {
+      if (state.path === 'online') state.step = 'photos';
+      else if (state.path === 'dealer') state.step = 'dealer-search';
+      render();
+    });
+  }
+
+  document.querySelectorAll('.choice-card').forEach(el => {
+    el.addEventListener('click', () => {
+      state.path = el.dataset.path;
+      render();
+    });
+  });
+
+  document.querySelectorAll('.photo-slot').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('remove-photo')) return;
+      const idx = parseInt(el.dataset.photoIndex);
+      if (!state.photos[idx]) {
+        state.photos[idx] = generateMockPhoto(PHOTO_VIEWS[idx]);
+        render();
+      }
+    });
+  });
+
+  document.querySelectorAll('.remove-photo').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(el.dataset.remove);
+      state.photos[idx] = null;
+      render();
+    });
+  });
+
+  if ($('photos-btn')) {
+    $('photos-btn').addEventListener('click', () => {
+      state.errors = {};
+      const filled = state.photos.filter(p => p).length;
+      if (filled < 8) {
+        state.errors.photos = `Please provide all 8 photos. ${8 - filled} remaining.`;
+        render();
+        return;
+      }
+      state.step = 'summary';
+      render();
+    });
+  }
+
+  document.querySelectorAll('.dealer-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = parseInt(el.dataset.dealerId);
+      state.dealer = MOCK_DEALERS.find(d => d.id === id);
+      render();
+    });
+  });
+
+  if ($('dealer-continue-btn')) {
+    $('dealer-continue-btn').addEventListener('click', () => {
+      if (state.dealer) { state.step = 'dealer-slot'; render(); }
+    });
+  }
+
+  document.querySelectorAll('.time-slot:not(.unavailable)').forEach(el => {
+    el.addEventListener('click', () => {
+      state.appointmentTime = el.dataset.time;
+      render();
+    });
+  });
+
+  if ($('slot-continue-btn')) {
+    $('slot-continue-btn').addEventListener('click', () => {
+      state.errors = {};
+      state.appointmentDate = $('appt-date')?.value || '';
+      if (!state.appointmentDate) {
+        state.errors.appointment = 'Please select a date.';
+        render();
+        return;
+      }
+      if (!state.appointmentTime) {
+        state.errors.appointment = 'Please select a time slot.';
+        render();
+        return;
+      }
+      state.step = 'summary';
+      render();
+    });
+  }
+
+  ['consent-storage','consent-share','consent-privacy'].forEach(id => {
+    $(id)?.addEventListener('change', (e) => {
+      const key = id.replace('consent-','');
+      state.consent[key] = e.target.checked;
+      render();
+    });
+  });
+
+  $('contact-name')?.addEventListener('input', e => { state.contactName = e.target.value; });
+  $('contact-email')?.addEventListener('input', e => { state.contactEmail = e.target.value; });
+  $('contact-phone')?.addEventListener('input', e => { state.contactPhone = e.target.value; });
+
+  if ($('submit-btn')) {
+    $('submit-btn').addEventListener('click', () => {
+      state.errors = {};
+      if (!state.contactName.trim() || !state.contactEmail.trim()) {
+        state.errors.contact = 'Please enter your name and email address.';
+        render();
+        return;
+      }
+      state.submitted = true;
+      state.step = 'confirmation';
+      render();
+    });
+  }
+
+  if ($('restart-btn')) {
+    $('restart-btn').addEventListener('click', () => {
+      Object.assign(state, {
+        step: 'plate', plate: '', vehicle: null, mileage: '', path: null,
+        photos: Array(8).fill(null), dealer: null, appointmentDate: '', appointmentTime: null,
+        contactName: '', contactEmail: '', contactPhone: '',
+        consent: { storage: false, share: false, privacy: false },
+        submitted: false, errors: {},
+      });
+      render();
+    });
+  }
+
+  if ($('dealer-view-btn')) {
+    $('dealer-view-btn').addEventListener('click', () => {
+      state.step = 'dealer-view';
+      render();
+    });
+  }
+
+  if ($('forward-btn')) {
+    $('forward-btn').addEventListener('click', () => {
+      const btn = $('forward-btn');
+      btn.disabled = true;
+      btn.textContent = 'Forwarding...';
+      setTimeout(() => {
+        $('forward-result').innerHTML = `
+          <div class="success-banner" style="margin-top:12px;">
+            Request forwarded to the trading platform. Buyers can now place bids. You will receive the bids in Syntec and can present an offer to the customer via email.
+          </div>
+        `;
+        btn.textContent = 'Forwarded';
+      }, 1500);
+    });
+  }
+
+  document.querySelectorAll('.tab').forEach(el => {
+    el.addEventListener('click', () => {
+      state.dealerViewTab = el.dataset.tab;
+      render();
+    });
+  });
+
+  document.querySelectorAll('#back-btn').forEach(el => {
+    // only first one
+  });
+  if ($('back-btn')) {
+    $('back-btn').addEventListener('click', () => {
+      const backMap = {
+        'mileage': 'plate',
+        'choice': 'mileage',
+        'photos': 'choice',
+        'dealer-search': 'choice',
+        'dealer-slot': 'dealer-search',
+        'summary': state.path === 'online' ? 'photos' : 'dealer-slot',
+        'dealer-view': 'confirmation',
+      };
+      state.step = backMap[state.step] || 'plate';
+      state.errors = {};
+      render();
+    });
+  }
+}
+
+render();
+</script>
+</body>
+</html>
