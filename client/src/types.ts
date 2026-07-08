@@ -57,9 +57,7 @@ export type AgentEvent =
 export type ContextSource = {
   id: string;
   label: string;
-  kind: "file" | "url";
   files: string[];
-  urls?: string[];
   instructions?: string;
   createdAt: string;
 };
@@ -70,13 +68,40 @@ export type ContextTier = {
   sourceIds: string[];
 };
 
+export type ReadinessStatus =
+  | "reviewing"
+  | "awaiting-answers"
+  | "compiling"
+  | "ready"
+  | "errored";
+
+export type ReadinessGap = {
+  id: string;
+  label: string;
+  category: "covered" | "implied" | "undecided";
+  detail?: string;
+  question?: string;
+};
+
+export type Readiness = {
+  id: string;
+  createdAt: string;
+  status: ReadinessStatus;
+  prompt: string;
+  sourceIds: string[];
+  pass1SessionId: string;
+  pass2SessionId?: string;
+  gaps?: ReadinessGap[];
+  answers?: Record<string, string>;
+  error?: string;
+};
+
 export type ContextVariant = {
   tierId: string;
   label: string;
   sourceIds: string[];
   sessionId: string;
   previewUrl: string;
-  chrome: boolean; // this variant drives the browser (single-channel mutex key)
 };
 
 export type ContextGeneration = {

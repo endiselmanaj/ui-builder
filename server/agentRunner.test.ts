@@ -13,22 +13,14 @@ const settings: Settings = {
 };
 
 describe("buildAgentArgs", () => {
-  it("default run restricts tools and has no --chrome", () => {
+  it("restricts tools to the configured allowlist", () => {
     const args = buildAgentArgs(settings, "hi");
     expect(args).toContain("--tools");
-    expect(args).not.toContain("--chrome");
+    expect(args[args.indexOf("--tools") + 1]).toBe("Edit,Write,Read,Bash");
   });
 
-  it("chrome run adds --chrome and drops the --tools restriction", () => {
-    const args = buildAgentArgs(settings, "hi", { chrome: true });
-    expect(args).toContain("--chrome");
-    // Browser MCP tools are deferred and loaded via ToolSearch; a --tools
-    // allowlist would exclude them (validated empirically).
-    expect(args).not.toContain("--tools");
-  });
-
-  it("chrome run keeps model/permission flags", () => {
-    const args = buildAgentArgs(settings, "hi", { chrome: true });
+  it("passes the model and permission-mode flags", () => {
+    const args = buildAgentArgs(settings, "hi");
     expect(args).toContain("--model");
     expect(args).toContain("--permission-mode");
   });

@@ -16,8 +16,12 @@ import {
   buildContextAgentPrompt,
   DEFAULT_CONTEXT_PROMPT,
   slugify,
-  sourceNeedsChrome,
 } from "./contextPrompt.js";
+import {
+  buildGapRevealPrompt,
+  buildCompilePrompt,
+  DEFAULT_READINESS_PROMPT,
+} from "./readinessPrompt.js";
 import type { Settings, ContextSource, ContextTier } from "./types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +40,7 @@ const DATA_DIR = path.join(ROOT, "data");
 const WORKSPACE_FILE = path.join(DATA_DIR, "workspace.json");
 const GENERATIONS_FILE = path.join(DATA_DIR, "generations.json");
 const CONTEXT_GENERATIONS_FILE = path.join(DATA_DIR, "context-generations.json");
+const READINESS_FILE = path.join(DATA_DIR, "readiness.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 
 const app = express();
@@ -200,7 +205,6 @@ type ContextVariant = {
   sourceIds: string[];
   sessionId: string;
   previewUrl: string;
-  chrome: boolean; // this variant drives the browser (single-channel mutex key)
 };
 
 type ContextGeneration = {
@@ -634,20 +638,6 @@ app.post("/api/context/sources", (req, res) => {
   });
 });
 
-app.post("/api/context/sources/url", (req, res) => {
-  const { label, urls, instructions } = req.body as {
-    label?: string;
-    urls?: string[];
-    instructions?: string;
-  };
-  if (!label?.trim()) return res.status(400).json({ error: "label required" });
-  const clean = (Array.isArray(urls) ? urls : [])
-    .map((u) => String(u).trim())
-    .filter((u) => /^https?:\/\//.test(u));
-  if (clean.length === 0) return res.status(400).json({ error: "at least one http(s) url required" });
-  res.json(contextLibrary.createUrlSource(label.trim(), clean, instructions?.trim() || undefined));
-});
-
 app.delete("/api/context/sources/:id", (req, res) => {
   contextLibrary.deleteSource(req.params.id);
   res.json({ ok: true });
@@ -659,8 +649,8 @@ app.get("/api/context/tiers", (_req, res) => {
 
 app.put("/api/context/tiers", (req, res) => {
   const body = req.body as ContextTier[];
-  if (!Array.isArray(body) || body.length !== 3) {
-    return res.status(400).json({ error: "expected exactly 3 tiers" });
+  if (!Array.isArray(body) || body.length !== 2) {
+    return res.status(400).json({ error: "expected exactly 2 tiers" });
   }
   const known = new Set(contextLibrary.listSources().map((s) => s.id));
   const tiers = body.map((t) => ({
@@ -722,25 +712,6 @@ app.post("/api/context-lab/generate", async (req, res) => {
     });
   }
 
-  const willUseChrome = tiers.some((t) =>
-    t.sourceIds.some((id) => contextLibrary.getSource(id)?.kind === "url"),
-  );
-
-  // Single-chrome mutex: only one browser-driving generation at a time (the
-  // extension is a single serial channel). Reconcile first so a stale
-  // "running" from a prior boot doesn't lock the room out forever.
-  if (willUseChrome) {
-    const chromeBusy = reconcileContextGenerations().some(
-      (g) => g.status === "running" && g.variants.some((v) => v.chrome),
-    );
-    if (chromeBusy) {
-      return res.status(409).json({
-        error:
-          "a Chrome-browsing generation is still running — wait for it to finish (single browser channel)",
-      });
-    }
-  }
-
   // 1) Resolve tiers → sources, create sessions, install files (fast, sync).
   const prepared = tiers.map((tier) => {
     const sources = tier.sourceIds
@@ -749,25 +720,22 @@ app.post("/api/context-lab/generate", async (req, res) => {
     const session = sessionManager.create();
     sessionManager.installContextFiles(
       session.id,
-      sources
-        .filter((s) => s.kind === "file")
-        .map((s) => ({
-          slug: slugify(s.label),
-          files: s.files.map((name) => ({
-            name,
-            absPath: path.join(contextLibrary.sourceDir(s.id), name),
-          })),
+      sources.map((s) => ({
+        slug: slugify(s.label),
+        files: s.files.map((name) => ({
+          name,
+          absPath: path.join(contextLibrary.sourceDir(s.id), name),
         })),
+      })),
     );
     return {
       tier,
       sources,
       sessionId: session.id,
-      chrome: sourceNeedsChrome(sources),
     };
   });
 
-  // 2) Boot all Vite servers CONCURRENTLY (true 3-up start, not sequential).
+  // 2) Boot all Vite servers CONCURRENTLY (true side-by-side start, not sequential).
   try {
     await Promise.all(prepared.map((p) => sessionManager.startVite(p.sessionId)));
   } catch (err: any) {
@@ -785,7 +753,6 @@ app.post("/api/context-lab/generate", async (req, res) => {
     sourceIds: p.tier.sourceIds,
     sessionId: p.sessionId,
     previewUrl: `/api/preview/${p.sessionId}/`,
-    chrome: p.chrome,
   }));
 
   const gen: ContextGeneration = {
@@ -818,9 +785,7 @@ app.post("/api/context-lab/generate", async (req, res) => {
       userPrompt: prompt,
       sources: p.sources,
     });
-    const bus = sessionManager.runAgent(p.sessionId, fullPrompt, settings, {
-      chrome: p.chrome,
-    });
+    const bus = sessionManager.runAgent(p.sessionId, fullPrompt, settings);
     const onEnd = (info: any) => {
       bus.off("end", onEnd);
       rollup(info?.code ?? 1);
@@ -831,80 +796,275 @@ app.post("/api/context-lab/generate", async (req, res) => {
   res.json(gen);
 });
 
-// The preflight must exercise the SAME path the real tier-3 run does — not
-// just "is the extension alive" — or it's a false-confidence canary. It opens
-// a tab, navigates the configured Figma URL, screenshots it, and reports
-// whether it saw the design vs a login/permission wall.
-function buildPreflightPrompt(figmaUrl: string): string {
-  return [
-    "You are verifying the claude-in-chrome browser integration end to end.",
-    "The browser tools are deferred; if a claude-in-chrome tool is not directly callable, load it first with ToolSearch (query: \"select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__computer\").",
-    "Steps:",
-    "1. tabs_context_mcp with createIfEmpty:true, then create a fresh tab.",
-    `2. Navigate to: ${figmaUrl}`,
-    "3. Wait for it to load, then take one screenshot.",
-    "4. Judge what you see. If it is a Figma design/prototype, reply with exactly: OK design-visible. If it is a login page, 'request access', or permission wall, reply with exactly: FAIL login-wall. If the browser tools never responded/connected, reply with exactly: FAIL not-connected.",
-    "Reply with ONLY that one line. Then close the tab.",
-  ].join("\n");
+// ---------- readiness lab ----------
+//
+// Part 1 of the workshop: feed the case materials, surface the gaps a builder
+// would still have to guess, let a human answer them, then compile a
+// downloadable Definition-of-Ready markdown that Context Lab consumes as an
+// extra context source. Two throwaway doc-only sessions (no Vite): pass 1
+// reveals gaps, pass 2 compiles the doc.
+
+type ReadinessStatus =
+  | "reviewing"
+  | "awaiting-answers"
+  | "compiling"
+  | "ready"
+  | "errored";
+
+type ReadinessGap = {
+  id: string;
+  label: string;
+  category: "covered" | "implied" | "undecided";
+  detail?: string;
+  question?: string;
+};
+
+type Readiness = {
+  id: string;
+  createdAt: string;
+  status: ReadinessStatus;
+  prompt: string;
+  sourceIds: string[];
+  pass1SessionId: string;
+  pass2SessionId?: string;
+  gaps?: ReadinessGap[];
+  answers?: Record<string, string>;
+  error?: string;
+};
+
+function readReadiness(): Readiness[] {
+  ensureDataDir();
+  if (!fs.existsSync(READINESS_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(READINESS_FILE, "utf-8"));
+  } catch {
+    return [];
+  }
 }
 
-app.post("/api/context-lab/preflight", (_req, res) => {
-  // Use the first url from any tier-3 (chrome) source so the canary hits the
-  // real asset. Fall back to figma.com if none configured.
-  const urlSource = contextLibrary
-    .listSources()
-    .find((s) => s.kind === "url" && (s.urls?.length ?? 0) > 0);
-  const figmaUrl = urlSource?.urls?.[0] ?? "https://www.figma.com";
+function writeReadiness(all: Readiness[]) {
+  ensureDataDir();
+  fs.writeFileSync(READINESS_FILE, JSON.stringify(all, null, 2));
+}
+
+function updateReadiness(id: string, patch: (r: Readiness) => Readiness) {
+  const all = readReadiness();
+  const idx = all.findIndex((r) => r.id === id);
+  if (idx < 0) return;
+  all[idx] = patch(all[idx]);
+  writeReadiness(all);
+}
+
+function installSourcesInto(sessionId: string, sources: ContextSource[]) {
+  sessionManager.installContextFiles(
+    sessionId,
+    sources.map((s) => ({
+      slug: slugify(s.label),
+      files: s.files.map((name) => ({
+        name,
+        absPath: path.join(contextLibrary.sourceDir(s.id), name),
+      })),
+    })),
+  );
+}
+
+function parseGaps(raw: string | null): ReadinessGap[] | null {
+  if (!raw) return null;
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    // Tolerate a fenced ```json block if the agent wrapped it.
+    const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (!m) return null;
+    try {
+      data = JSON.parse(m[1]);
+    } catch {
+      return null;
+    }
+  }
+  const arr = Array.isArray(data) ? data : Array.isArray(data?.gaps) ? data.gaps : null;
+  if (!arr) return null;
+  return arr.map((g: any, i: number): ReadinessGap => {
+    const category =
+      g?.category === "covered" || g?.category === "implied" ? g.category : "undecided";
+    return {
+      id: String(g?.id ?? `gap-${i + 1}`),
+      label: String(g?.label ?? `Item ${i + 1}`),
+      category,
+      detail: g?.detail ? String(g.detail) : undefined,
+      question: g?.question ? String(g.question) : undefined,
+    };
+  });
+}
+
+// Correct records left mid-flight by a server restart: their session bus is
+// gone, so the in-process end listener can never fire.
+function reconcileReadiness(): Readiness[] {
+  const all = readReadiness();
+  let changed = false;
+  for (const r of all) {
+    if (r.status === "reviewing") {
+      const st = sessionManager.status(r.pass1SessionId);
+      if (st === "ready" || st === "errored" || st === "stopped") {
+        const gaps = parseGaps(sessionManager.readSessionFile(r.pass1SessionId, "gaps.json"));
+        if (gaps) {
+          r.status = "awaiting-answers";
+          r.gaps = gaps;
+        } else {
+          r.status = "errored";
+          r.error = "gap review did not produce gaps.json";
+        }
+        changed = true;
+      }
+    } else if (r.status === "compiling" && r.pass2SessionId) {
+      const st = sessionManager.status(r.pass2SessionId);
+      if (st === "ready" || st === "errored" || st === "stopped") {
+        const doc = sessionManager.readSessionFile(r.pass2SessionId, "definition-of-ready.md");
+        r.status = doc ? "ready" : "errored";
+        if (!doc) r.error = "compile did not produce definition-of-ready.md";
+        changed = true;
+      }
+    }
+  }
+  if (changed) writeReadiness(all);
+  return all;
+}
+
+app.get("/api/readiness", (_req, res) => {
+  res.json(reconcileReadiness());
+});
+
+app.get("/api/readiness/:id", (req, res) => {
+  const r = reconcileReadiness().find((x) => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: "not found" });
+  res.json(r);
+});
+
+app.post("/api/readiness/start", async (req, res) => {
+  const raw = (req.body?.prompt ?? "").toString().trim();
+  const prompt = raw.length > 0 ? raw : DEFAULT_READINESS_PROMPT;
+  const sourceIds: string[] = Array.isArray(req.body?.sourceIds) ? req.body.sourceIds : [];
+  const sources = sourceIds
+    .map((id) => contextLibrary.getSource(id))
+    .filter((s): s is ContextSource => s !== null);
+  if (sources.length === 0) {
+    return res.status(400).json({ error: "select at least one context source" });
+  }
 
   const settings = readSettings();
-  // Same permission mode as the real chrome generate run, so a pass here means
-  // the production configuration works.
-  const args = [
-    "-p",
-    buildPreflightPrompt(figmaUrl),
-    "--chrome",
-    "--permission-mode",
-    settings.permissionMode === "dontAsk" ? "acceptEdits" : settings.permissionMode,
-    "--output-format",
-    "json",
-  ];
-  const child = spawn("claude", args, {
-    cwd: os.tmpdir(),
-    env: { ...process.env },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let out = "";
-  let done = false;
-  const finish = (ok: boolean, detail: string) => {
-    if (done) return;
-    done = true;
-    clearTimeout(timer);
-    res.json({ ok, detail });
+  const session = sessionManager.create();
+  installSourcesInto(session.id, sources);
+
+  const readiness: Readiness = {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    status: "reviewing",
+    prompt,
+    sourceIds,
+    pass1SessionId: session.id,
   };
-  const timer = setTimeout(() => {
-    try { child.kill("SIGTERM"); } catch {}
-    finish(false, "preflight timed out after 120s");
-  }, 120_000);
-  child.stdout.on("data", (b: Buffer) => (out += b.toString()));
-  child.on("close", () => {
-    try {
-      const parsed = JSON.parse(out);
-      const text = String(parsed?.result ?? "");
-      if (text.includes("OK design-visible")) {
-        return finish(true, "Chrome connected and the Figma design rendered");
+  const all = readReadiness();
+  all.unshift(readiness);
+  writeReadiness(all);
+
+  const bus = sessionManager.runAgent(
+    session.id,
+    buildGapRevealPrompt({ userPrompt: prompt, sources }),
+    settings,
+  );
+  const onEnd = (info: any) => {
+    bus.off("end", onEnd);
+    if (info?.code === 0) {
+      const gaps = parseGaps(sessionManager.readSessionFile(session.id, "gaps.json"));
+      if (gaps) {
+        updateReadiness(readiness.id, (r) => ({ ...r, status: "awaiting-answers", gaps }));
+        return;
       }
-      if (text.includes("login-wall")) {
-        return finish(false, "Chrome connected but the URL shows a login/permission wall — log into Figma / fix sharing");
-      }
-      if (text.includes("not-connected")) {
-        return finish(false, "browser extension did not respond — open Chrome, connect the extension");
-      }
-      finish(false, text.slice(0, 300) || "inconclusive preflight");
-    } catch {
-      finish(false, `unparseable preflight output: ${out.slice(0, 200)}`);
     }
-  });
-  child.on("error", (err) => finish(false, String(err?.message ?? err)));
+    updateReadiness(readiness.id, (r) => ({
+      ...r,
+      status: "errored",
+      error: "gap review did not produce a valid gaps.json",
+    }));
+  };
+  bus.on("end", onEnd);
+
+  res.json(readiness);
+});
+
+app.post("/api/readiness/:id/compile", async (req, res) => {
+  const all = readReadiness();
+  const readiness = all.find((r) => r.id === req.params.id);
+  if (!readiness) return res.status(404).json({ error: "not found" });
+  if (readiness.status !== "awaiting-answers") {
+    return res.status(409).json({ error: `cannot compile from status "${readiness.status}"` });
+  }
+
+  const answers: Record<string, string> =
+    req.body?.answers && typeof req.body.answers === "object" ? req.body.answers : {};
+  const sources = readiness.sourceIds
+    .map((id) => contextLibrary.getSource(id))
+    .filter((s): s is ContextSource => s !== null);
+
+  const settings = readSettings();
+  const session = sessionManager.create();
+  installSourcesInto(session.id, sources);
+  sessionManager.writeSessionFile(
+    session.id,
+    "gaps.json",
+    JSON.stringify(readiness.gaps ?? [], null, 2),
+  );
+  sessionManager.writeSessionFile(session.id, "answers.json", JSON.stringify(answers, null, 2));
+
+  updateReadiness(readiness.id, (r) => ({
+    ...r,
+    status: "compiling",
+    answers,
+    pass2SessionId: session.id,
+  }));
+
+  const bus = sessionManager.runAgent(
+    session.id,
+    buildCompilePrompt({ userPrompt: readiness.prompt, sources }),
+    settings,
+  );
+  const onEnd = (info: any) => {
+    bus.off("end", onEnd);
+    const doc =
+      info?.code === 0
+        ? sessionManager.readSessionFile(session.id, "definition-of-ready.md")
+        : null;
+    updateReadiness(readiness.id, (r) => ({
+      ...r,
+      status: doc ? "ready" : "errored",
+      error: doc ? undefined : "compile did not produce definition-of-ready.md",
+    }));
+  };
+  bus.on("end", onEnd);
+
+  res.json({ ...readiness, status: "compiling", answers, pass2SessionId: session.id });
+});
+
+app.get("/api/readiness/:id/document", (req, res) => {
+  const r = readReadiness().find((x) => x.id === req.params.id);
+  if (!r?.pass2SessionId) return res.status(404).json({ error: "not found" });
+  const doc = sessionManager.readSessionFile(r.pass2SessionId, "definition-of-ready.md");
+  if (doc === null) return res.status(404).json({ error: "document not ready" });
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="definition-of-ready-${r.id}.md"`);
+  res.send(doc);
+});
+
+app.delete("/api/readiness/:id", async (req, res) => {
+  const all = readReadiness();
+  const r = all.find((x) => x.id === req.params.id);
+  writeReadiness(all.filter((x) => x.id !== req.params.id));
+  if (r) {
+    await sessionManager.destroy(r.pass1SessionId);
+    if (r.pass2SessionId) await sessionManager.destroy(r.pass2SessionId);
+  }
+  res.json({ ok: true });
 });
 
 // ---------- review agent ----------

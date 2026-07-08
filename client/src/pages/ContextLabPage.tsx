@@ -19,9 +19,6 @@ export function ContextLabPage() {
   const [prompt, setPrompt] = useState(DEFAULT_CONTEXT_PROMPT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preflight, setPreflight] = useState<
-    { state: "idle" } | { state: "running" } | { state: "done"; ok: boolean; detail: string }
-  >({ state: "idle" });
 
   async function refreshSources() {
     const [s, t] = await Promise.all([
@@ -93,20 +90,6 @@ export function ContextLabPage() {
     setGenerations((prev) => prev.filter((g) => g.id !== id));
   }
 
-  async function testChrome() {
-    setPreflight({ state: "running" });
-    try {
-      const res = await fetch("/api/context-lab/preflight", { method: "POST" });
-      const body = await res.json();
-      setPreflight({ state: "done", ok: !!body.ok, detail: body.detail ?? "" });
-    } catch (e: any) {
-      setPreflight({ state: "done", ok: false, detail: e.message });
-    }
-  }
-
-  const anyChromeTier = tiers.some((t) =>
-    t.sourceIds.some((id) => sources.find((s) => s.id === id)?.kind === "url"),
-  );
   const busy = loading || anyRunning;
 
   return (
@@ -122,48 +105,29 @@ export function ContextLabPage() {
         <PromptInput
           value={prompt}
           onChange={setPrompt}
-          disabled={busy || preflight.state === "running"}
+          disabled={busy}
           onSubmit={generate}
         />
 
         <TierConfigRow sources={sources} tiers={tiers} onTiersChange={saveTiers} />
 
         <div className="compose-row">
-          {anyChromeTier && (
-            <button
-              className="ghost"
-              onClick={testChrome}
-              disabled={preflight.state === "running" || busy}
-            >
-              {preflight.state === "running"
-                ? "Testing Chrome…"
-                : preflight.state === "done"
-                  ? preflight.ok
-                    ? "✓ Chrome connected"
-                    : "✗ Chrome not connected"
-                  : "Test Chrome"}
-            </button>
-          )}
           <div className="grow" />
           <button
             className="primary"
             onClick={generate}
-            disabled={busy || preflight.state === "running" || prompt.trim().length === 0}
+            disabled={busy || prompt.trim().length === 0}
           >
-            {busy ? "Generating…" : "Generate 3 variants"}
+            {busy ? "Generating…" : "Generate"}
           </button>
           {busy && <div className="spinner" aria-label="Generating" />}
         </div>
         {anyRunning && (
           <div className="muted">
-            A run is in progress — only one generation at a time (the Figma tier
-            uses the shared browser).
+            A run is in progress — only one generation at a time.
           </div>
         )}
 
-        {preflight.state === "done" && !preflight.ok && (
-          <div className="error">Chrome preflight: {preflight.detail}</div>
-        )}
         {error && <div className="error">Error: {error}</div>}
       </div>
 

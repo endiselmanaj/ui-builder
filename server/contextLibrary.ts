@@ -10,15 +10,12 @@ const DEFAULT_DATA_DIR = path.resolve(__dirname, "..", "data");
 const DEFAULT_TIERS: ContextTier[] = [
   { id: "tier-1", label: "Briefing only", sourceIds: [] },
   { id: "tier-2", label: "Briefing + Schematic", sourceIds: [] },
-  { id: "tier-3", label: "Briefing + Schematic + Figma", sourceIds: [] },
 ];
 
 type SeedConfig = {
   sources: Array<{
     label: string;
-    kind: "file" | "url";
     files?: string[];
-    urls?: string[];
     instructions?: string;
   }>;
   tiers?: Record<string, string[]>; // tierId -> source labels
@@ -70,36 +67,19 @@ export function createContextLibrary(dataDir: string) {
   function createFileSource(
     label: string,
     files: { name: string; buffer: Buffer }[],
+    instructions?: string,
   ): ContextSource {
     const src: ContextSource = {
       id: crypto.randomUUID(),
       label,
-      kind: "file",
       files: files.map((f) => path.basename(f.name)),
+      instructions,
       createdAt: new Date().toISOString(),
     };
     writeMeta(src);
     for (const f of files) {
       fs.writeFileSync(path.join(sourceDir(src.id), path.basename(f.name)), f.buffer);
     }
-    return src;
-  }
-
-  function createUrlSource(
-    label: string,
-    urls: string[],
-    instructions?: string,
-  ): ContextSource {
-    const src: ContextSource = {
-      id: crypto.randomUUID(),
-      label,
-      kind: "url",
-      files: [],
-      urls,
-      instructions,
-      createdAt: new Date().toISOString(),
-    };
-    writeMeta(src);
     return src;
   }
 
@@ -115,7 +95,7 @@ export function createContextLibrary(dataDir: string) {
   function readTiers(): ContextTier[] {
     try {
       const stored = JSON.parse(fs.readFileSync(tiersFile, "utf-8"));
-      if (Array.isArray(stored) && stored.length === 3) return stored;
+      if (Array.isArray(stored) && stored.length === 2) return stored;
     } catch {}
     return DEFAULT_TIERS.map((t) => ({ ...t, sourceIds: [...t.sourceIds] }));
   }
@@ -141,23 +121,18 @@ export function createContextLibrary(dataDir: string) {
 
     for (const seed of cfg.sources ?? []) {
       if (existingLabels.has(seed.label)) continue;
-      if (seed.kind === "file") {
-        const files = (seed.files ?? [])
-          .map((name) => {
-            const p = path.join(seedsDir, name);
-            if (!fs.existsSync(p)) return null;
-            return { name, buffer: fs.readFileSync(p) };
-          })
-          .filter((f): f is { name: string; buffer: Buffer } => f !== null);
-        if (files.length === 0) continue;
-        byLabel.set(seed.label, createFileSource(seed.label, files));
-      } else {
-        if (!seed.urls || seed.urls.length === 0) continue;
-        byLabel.set(
-          seed.label,
-          createUrlSource(seed.label, seed.urls, seed.instructions),
-        );
-      }
+      const files = (seed.files ?? [])
+        .map((name) => {
+          const p = path.join(seedsDir, name);
+          if (!fs.existsSync(p)) return null;
+          return { name, buffer: fs.readFileSync(p) };
+        })
+        .filter((f): f is { name: string; buffer: Buffer } => f !== null);
+      if (files.length === 0) continue;
+      byLabel.set(
+        seed.label,
+        createFileSource(seed.label, files, seed.instructions),
+      );
     }
 
     if (cfg.tiers) {
@@ -178,7 +153,6 @@ export function createContextLibrary(dataDir: string) {
     listSources,
     getSource,
     createFileSource,
-    createUrlSource,
     deleteSource,
     sourceDir,
     readTiers,

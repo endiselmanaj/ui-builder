@@ -36,21 +36,23 @@ server/sessionManager.ts — session lifecycle: dir setup, Vite, agent spawn
 server/agentRunner.ts    — spawns `claude -p` with stream-json output
 server/proxy.ts          — http-proxy-middleware to session Vite servers
 server/types.ts          — shared Settings type
-server/contextLibrary.ts — context sources (files/urls) + tiers, data/context/
+server/contextLibrary.ts — context sources (file bundles) + tiers, data/context/
 server/contextPrompt.ts  — context-lab agent prompt builder
+server/readinessPrompt.ts — readiness gap-reveal + DoR-compile prompt builders
 server/contextFiles.ts   — pure copy helper: files → session context/<slug>/
 
 client/src/App.tsx           — nav + view switch + shared state
 client/src/pages/GeneratePage.tsx — prompt input + skill picker + generation feed
 client/src/pages/SkillsPage.tsx   — workspace install/uninstall
-client/src/pages/ContextLabPage.tsx — context lab page (3-tier compare)
+client/src/pages/ContextLabPage.tsx — context lab page (2-tier compare)
+client/src/pages/ReadinessPage.tsx — readiness lab: gap reveal → answer → download DoR .md
 client/src/GenerationCard.tsx     — iframe preview + ActivityLog per variant
 client/src/ActivityLog.tsx        — derives timeline from raw agent events
 client/src/hooks/useAgentEvents.ts — SSE → AgentEvent[]
 client/src/Settings.tsx           — drawer for claude flag config
 client/src/ContextSourcePanel.tsx   — context library upload/manage panel
 client/src/TierConfigRow.tsx        — per-tier source chips
-client/src/ContextGenerationCard.tsx — 3-up preview card with focus mode
+client/src/ContextGenerationCard.tsx — side-by-side preview card with focus mode
 
 templates/base/          — Vite scaffold copied into each session (react, tailwind v4, recharts, zod, lucide-react)
 skills/*.md              — skill catalog (markdown rule sheets)
@@ -63,8 +65,9 @@ data/                    — gitignored runtime state (workspace.json, generatio
 - **Library** = all skills on disk. **Workspace** = installed subset. **Loaded** = skills selected for a generation. Loaded ⊆ Installed ⊆ Library.
 - **Session** — sandbox under `data/sessions/<uuid>/` with its own Vite server and agent process.
 - **Generation** — one prompt run: 1 session (solo) or 2 sessions (compare mode).
-- **Context source** — a file bundle or URL set in `data/context/` used as agent input.
-- **Tier** — ordered source list; Context Lab runs one session per non-empty tier.
+- **Context source** — a file bundle in `data/context/` used as agent input.
+- **Tier** — ordered source list; Context Lab runs one session per non-empty tier (2 tiers).
+- **Readiness run** — two doc-only agent passes over selected context sources: pass 1 writes `gaps.json` (covered/implied/undecided), a human answers the open ones, pass 2 writes `definition-of-ready.md` which the user downloads and uploads into Context Lab. No Vite/preview.
 
 ## Architecture
 
@@ -88,14 +91,18 @@ Each session spins up a Vite on a random port (`127.0.0.1`). Express proxies at 
 - `ALL /api/preview/:sessionId/*` — proxy to session Vite
 - `GET /api/context/sources` → list of context sources
 - `POST /api/context/sources` — multipart upload, `{ label, files[] }` → creates a file source
-- `POST /api/context/sources/url` `{ label, urls: string[], instructions? }` → creates a url source
 - `DELETE /api/context/sources/:id`
-- `GET /api/context/tiers` → the 3 configured tiers
-- `PUT /api/context/tiers` `ContextTier[]` (exactly 3) — updates tier→source assignments
+- `GET /api/context/tiers` → the 2 configured tiers
+- `PUT /api/context/tiers` `ContextTier[]` (exactly 2) — updates tier→source assignments
 - `GET /api/context-lab/generations` — newest first, reconciles stale `running` on read
-- `POST /api/context-lab/generate` `{ prompt? }` — one session per non-empty tier; `409` if a chrome (url-source) generation is already running
+- `POST /api/context-lab/generate` `{ prompt? }` — one session per non-empty tier
 - `DELETE /api/context-lab/generations/:id` — kills sessions + removes from disk
-- `POST /api/context-lab/preflight` — throwaway `--chrome` run that navigates the configured Figma URL and reports connectivity/login-wall status
+- `GET /api/readiness` — readiness runs, newest first (reconciles stale in-flight on read)
+- `GET /api/readiness/:id` → a single `Readiness`
+- `POST /api/readiness/start` `{ sourceIds: string[], prompt? }` — pass 1 (gap reveal); returns `Readiness` immediately, agent runs in background
+- `POST /api/readiness/:id/compile` `{ answers: Record<gapId,string> }` — pass 2 (compile DoR); `409` unless status is `awaiting-answers`
+- `GET /api/readiness/:id/document` — the compiled `definition-of-ready.md` as a markdown download
+- `DELETE /api/readiness/:id` — kills both sessions + removes from disk
 
 ## How the agent runs
 
@@ -114,7 +121,7 @@ claude -p "<prompt>"
 - **stdin is closed** (`stdio: ["ignore", "pipe", "pipe"]`) to avoid the 3s "no stdin" warning.
 - **cwd = session dir** so `claude` auto-loads `.claude/skills/*.md` files copied there.
 - **`is_error` on exit** — `claude -p` exits 0 even on errors; check `{ is_error: true }` in the final event.
-- **Context Lab chrome runs** — a tier with a url source runs with `--chrome` and WITHOUT `--tools`: dropping `--tools` yields the full default built-in set (incl. Skill/ToolSearch), which load the deferred `mcp__claude-in-chrome__*` tools; a `--tools` allowlist would exclude them. Only one chrome run at a time, enforced by a server-side 409 mutex (`/api/context-lab/generate`).
+- **Context Lab runs** use the same flag set as skills-mode runs (one session per non-empty tier, no `--chrome`).
 
 ## Default settings
 
@@ -144,4 +151,3 @@ claude -p "<prompt>"
 2. No Vite memory cap — each session is ~100-200 MB, no concurrency limit
 3. `templates/base/node_modules` is shared via symlink — agent `npm install` would pollute it
 4. Agent has `Bash` as the user — do not deploy without containerization. This extends to Context Lab: uploaded context files are trusted-local-assets only — the agent reads them with Bash available, so an untrusted PDF/XML is a prompt-injection vector; don't expose Context Lab uploads to untrusted users
-5. Context Lab preflight spawns a throwaway `--chrome` run that navigates/screenshots the real Figma URL (~30-90s) and requires Chrome + the extension + an active Figma login on the host

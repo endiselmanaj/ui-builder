@@ -27,9 +27,8 @@ const gen: ContextGeneration = {
   prompt: "Build the tool",
   status: "running",
   variants: [
-    { tierId: "tier-1", label: "Briefing only", sourceIds: ["a"], sessionId: "s1", previewUrl: "/api/preview/s1/", chrome: false },
-    { tierId: "tier-2", label: "Briefing + Schematic", sourceIds: ["a", "b"], sessionId: "s2", previewUrl: "/api/preview/s2/", chrome: false },
-    { tierId: "tier-3", label: "Briefing + Schematic + Figma", sourceIds: ["a", "b", "c"], sessionId: "s3", previewUrl: "/api/preview/s3/", chrome: true },
+    { tierId: "tier-1", label: "Briefing only", sourceIds: ["a"], sessionId: "s1", previewUrl: "/api/preview/s1/" },
+    { tierId: "tier-2", label: "Briefing + Schematic", sourceIds: ["a", "b"], sessionId: "s2", previewUrl: "/api/preview/s2/" },
   ],
 };
 
@@ -38,7 +37,6 @@ describe("ContextGenerationCard", () => {
     render(<ContextGenerationCard gen={gen} onDelete={vi.fn()} />);
     expect(screen.getByText("Briefing only")).toBeInTheDocument();
     expect(screen.getByText("Briefing + Schematic")).toBeInTheDocument();
-    expect(screen.getByText("Briefing + Schematic + Figma")).toBeInTheDocument();
   });
 
   it("clicking a column header focuses it; clicking again unfocuses", () => {
@@ -53,21 +51,20 @@ describe("ContextGenerationCard", () => {
 
   it("focusing the last column widens its track and marks only that column focused", () => {
     const { container } = render(<ContextGenerationCard gen={gen} onDelete={vi.fn()} />);
-    const header = screen.getByRole("button", { name: /focus Briefing \+ Schematic \+ Figma/i });
+    const header = screen.getByRole("button", { name: /focus Briefing \+ Schematic/i });
     fireEvent.click(header);
 
     const grid = container.querySelector(".ctx-grid") as HTMLElement;
     expect(grid).not.toBeNull();
     expect(grid.style.gridTemplateColumns.endsWith("minmax(0, 1fr)")).toBe(true);
     expect(grid.style.gridTemplateColumns).toBe(
-      "minmax(0, 140px) minmax(0, 140px) minmax(0, 1fr)",
+      "minmax(0, 140px) minmax(0, 1fr)",
     );
 
     const cols = container.querySelectorAll(".ctx-col");
-    expect(cols).toHaveLength(3);
+    expect(cols).toHaveLength(2);
     expect(cols[0].className).not.toContain("focused");
-    expect(cols[1].className).not.toContain("focused");
-    expect(cols[2].className).toContain("focused");
+    expect(cols[1].className).toContain("focused");
   });
 
   it("delete button calls onDelete", () => {

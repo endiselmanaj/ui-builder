@@ -5,6 +5,7 @@ import { GeneratePage } from "./pages/GeneratePage";
 import { SkillsPage } from "./pages/SkillsPage";
 import { ComparePage } from "./pages/ComparePage";
 import { ContextLabPage } from "./pages/ContextLabPage";
+import { ReadinessPage } from "./pages/ReadinessPage";
 import { Settings } from "./Settings";
 import type {
   Generation,
@@ -112,6 +113,7 @@ export function App() {
           }
         />
         <Route path="/skills" element={<SkillsPage skills={skills} />} />
+        <Route path="/readiness" element={<ReadinessPage />} />
         <Route path="/context-lab" element={<ContextLabPage />} />
         <Route path="/compare/:generationId" element={<ComparePage />} />
       </Routes>}

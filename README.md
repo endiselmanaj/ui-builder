@@ -41,10 +41,9 @@ Then open **http://localhost:5173** in your browser.
 4. Toggle **Compare** to generate two versions side by side (with and without skills)
 5. Click **Generate** and wait ~20-60 seconds for the live preview
 6. Open **Context Lab** to run the "preparation matters" demo: the same
-   prompt is built three times with increasingly rich context (briefing →
-   +process schematic → +live Figma design browse) and shown side by side.
-   Upload your own PDFs/images/XML or add URL sources for the agent to
-   browse live via the Claude Chrome extension.
+   prompt is built twice with increasingly rich context (briefing →
+   +process schematic) and shown side by side, so you can pick the result
+   you prefer. Upload your own PDFs/images/XML as context sources.
 
 Past generations are saved and persist across page reloads.
 

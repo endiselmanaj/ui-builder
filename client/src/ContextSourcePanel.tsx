@@ -10,9 +10,6 @@ export function ContextSourcePanel({
 }) {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
-  const [urlLabel, setUrlLabel] = useState("");
-  const [urls, setUrls] = useState("");
-  const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -33,36 +30,6 @@ export function ContextSourcePanel({
       if (!res.ok) throw new Error((await res.json())?.error ?? `HTTP ${res.status}`);
       setLabel("");
       if (fileRef.current) fileRef.current.value = "";
-      await onChanged();
-    } catch (e: any) {
-      setErr(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function addUrlSource() {
-    const list = urls.split("\n").map((u) => u.trim()).filter(Boolean);
-    if (!urlLabel.trim() || list.length === 0) {
-      setErr("url source needs a label and at least one url");
-      return;
-    }
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await fetch("/api/context/sources/url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: urlLabel.trim(),
-          urls: list,
-          instructions: instructions.trim() || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json())?.error ?? `HTTP ${res.status}`);
-      setUrlLabel("");
-      setUrls("");
-      setInstructions("");
       await onChanged();
     } catch (e: any) {
       setErr(e.message);
@@ -95,13 +62,8 @@ export function ContextSourcePanel({
           <ul className="ctx-source-list">
             {sources.map((s) => (
               <li key={s.id}>
-                <span className={`src-chip src-chip-${s.kind}`}>
-                  {s.kind === "url" ? "🔗 " : "📄 "}
-                  {s.label}
-                </span>
-                <span className="muted">
-                  {s.kind === "url" ? (s.urls ?? []).join(", ") : s.files.join(", ")}
-                </span>
+                <span className="src-chip">📄 {s.label}</span>
+                <span className="muted">{s.files.join(", ")}</span>
                 <button className="ghost" onClick={() => remove(s.id)}>
                   delete
                 </button>
@@ -120,27 +82,6 @@ export function ContextSourcePanel({
               />
               <input ref={fileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.xml,.md,.txt" />
               <button onClick={uploadFiles} disabled={busy}>Add file source</button>
-            </div>
-            <div className="ctx-form">
-              <strong>Add URL source (browsed live)</strong>
-              <input
-                placeholder="label, e.g. Figma design"
-                value={urlLabel}
-                onChange={(e) => setUrlLabel(e.target.value)}
-              />
-              <textarea
-                placeholder="one URL per line"
-                value={urls}
-                onChange={(e) => setUrls(e.target.value)}
-                rows={2}
-              />
-              <textarea
-                placeholder="extra instructions for the agent (optional)"
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                rows={2}
-              />
-              <button onClick={addUrlSource} disabled={busy}>Add URL source</button>
             </div>
           </div>
           {err && <div className="error">{err}</div>}

@@ -27,6 +27,12 @@ export function Nav({
           Skills
         </Link>
         <Link
+          to="/readiness"
+          className={`nav-tab${pathname === "/readiness" ? " active" : ""}`}
+        >
+          Readiness
+        </Link>
+        <Link
           to="/context-lab"
           className={`nav-tab${pathname === "/context-lab" ? " active" : ""}`}
         >

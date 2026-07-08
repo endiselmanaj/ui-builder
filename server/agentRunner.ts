@@ -6,8 +6,6 @@ export type AgentOptions = {
   cwd: string;
   prompt: string;
   settings: Settings;
-  /** attach the claude-in-chrome browser (drops --tools so MCP tools load) */
-  chrome?: boolean;
 };
 
 // EventEmitter the orchestrator subscribes to. Carries the spawned child
@@ -15,9 +13,7 @@ export type AgentOptions = {
 export type AgentEmitter = EventEmitter & { child: ChildProcess };
 
 export function runAgent(opts: AgentOptions): AgentEmitter {
-  const args = buildAgentArgs(opts.settings, opts.prompt, {
-    chrome: opts.chrome,
-  });
+  const args = buildAgentArgs(opts.settings, opts.prompt);
 
   // stdin: "ignore" closes the child's stdin so claude doesn't print the
   // "no stdin data received in 3s" warning and we save 3s on every cold call.
@@ -74,7 +70,6 @@ export function runAgent(opts: AgentOptions): AgentEmitter {
 export function buildAgentArgs(
   settings: Settings,
   prompt: string,
-  opts?: { chrome?: boolean },
 ): string[] {
   const args: string[] = [];
   if (settings.bare) args.push("--bare");
@@ -90,23 +85,14 @@ export function buildAgentArgs(
       ? "acceptEdits"
       : settings.permissionMode,
   );
-  if (opts?.chrome) {
-    // Chrome runs need the full default toolset. A --tools "Edit,Write,Read,Bash"
-    // allowlist would exclude the built-in Skill/ToolSearch tools, which the
-    // agent uses to load the deferred mcp__claude-in-chrome__* browser tools.
-    // Omitting --tools yields all built-ins (incl. Edit/Write/Read/Bash), so the
-    // agent can browse AND write files.
-    args.push("--chrome");
-  } else {
-    // Default to a real tool set in agent mode; only respect a non-empty
-    // override if it actually has tools (settings.tools "" was the old "no
-    // tools" pattern from the one-shot pipeline).
-    const tools =
-      settings.tools && settings.tools.trim().length > 0
-        ? settings.tools
-        : "Edit,Write,Read,Bash";
-    args.push("--tools", tools);
-  }
+  // Default to a real tool set in agent mode; only respect a non-empty
+  // override if it actually has tools (settings.tools "" was the old "no
+  // tools" pattern from the one-shot pipeline).
+  const tools =
+    settings.tools && settings.tools.trim().length > 0
+      ? settings.tools
+      : "Edit,Write,Read,Bash";
+  args.push("--tools", tools);
   if (settings.effort) args.push("--effort", settings.effort);
   if (settings.maxBudgetUsd !== null) {
     args.push("--max-budget-usd", String(settings.maxBudgetUsd));

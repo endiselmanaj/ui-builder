@@ -235,7 +235,6 @@ class Manager {
     id: string,
     fullPrompt: string,
     settings: Settings,
-    opts?: { chrome?: boolean },
   ): EventEmitter {
     const s = this.must(id);
     this.setStatus(s, "agent-running");
@@ -243,7 +242,6 @@ class Manager {
       cwd: s.dir,
       prompt: fullPrompt,
       settings,
-      chrome: opts?.chrome,
     });
     s.agent = (ee as any).child as ChildProcess | undefined;
 
@@ -291,6 +289,25 @@ class Manager {
     s.meta.port = undefined;
     this.setStatus(s, "stopped");
     writeMeta(s.dir, s.meta);
+  }
+
+  /** Read a file from a session's sandbox dir. Returns null if absent. */
+  readSessionFile(id: string, rel: string): string | null {
+    const s = this.sessions.get(id);
+    if (!s) return null;
+    try {
+      return fs.readFileSync(path.join(s.dir, path.normalize(rel)), "utf-8");
+    } catch {
+      return null;
+    }
+  }
+
+  /** Write a file into a session's sandbox dir (creating parent dirs). */
+  writeSessionFile(id: string, rel: string, content: string): void {
+    const s = this.must(id);
+    const full = path.join(s.dir, path.normalize(rel));
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, content);
   }
 
   getSessionFiles(id: string): Record<string, string> {

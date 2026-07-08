@@ -27,8 +27,8 @@ export function TierConfigRow({
             <div className="tier-config-label">{tier.label}</div>
             <div className="tier-config-chips">
               {chips.map((s) => (
-                <span key={s.id} className={`src-chip src-chip-${s.kind}`}>
-                  <span aria-hidden="true">{s.kind === "url" ? "🔗 " : "📄 "}</span>
+                <span key={s.id} className="src-chip">
+                  <span aria-hidden="true">📄 </span>
                   {s.label}
                   <button
                     className="src-chip-x"
