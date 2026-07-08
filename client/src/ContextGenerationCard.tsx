@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { ActivityLog } from "./ActivityLog";
 import { StatusPill } from "./GenerationCard";
 import { Preview } from "./Preview";
@@ -64,7 +64,7 @@ export function ContextGenerationCard({
   // Drive the column widths from the focused INDEX, not DOM child position, so
   // focusing any column (incl. the last) always widens the right one. Columns
   // stay in natural order; the focused track gets 1fr, the rest go slim.
-  const gridStyle: React.CSSProperties = {
+  const gridStyle: CSSProperties = {
     gridTemplateColumns:
       focusedIdx < 0
         ? `repeat(${gen.variants.length}, minmax(0, 1fr))`
