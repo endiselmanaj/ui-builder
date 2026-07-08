@@ -40,6 +40,11 @@ Then open **http://localhost:5173** in your browser.
 3. Click **+ Skills** to pick style guides that shape the output
 4. Toggle **Compare** to generate two versions side by side (with and without skills)
 5. Click **Generate** and wait ~20-60 seconds for the live preview
+6. Open **Context Lab** to run the "preparation matters" demo: the same
+   prompt is built three times with increasingly rich context (briefing →
+   +process schematic → +live Figma design browse) and shown side by side.
+   Upload your own PDFs/images/XML or add URL sources for the agent to
+   browse live via the Claude Chrome extension.
 
 Past generations are saved and persist across page reloads.
 
